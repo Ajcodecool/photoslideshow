@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pi Dashboard Pro + Scheduler + Live Chat (Android 6 Safe)</title>
+    <title>Dashboard Pro + Scheduler + Live Chat (Supabase Edition)</title>
     
     <style>
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -180,7 +180,7 @@
         <div class="schedule-row" style="flex-direction: column; align-items: stretch; gap: 8px;">
             <span style="text-align: left;">Upload New Photo:</span>
             <input type="file" id="fileInput" accept="image/*" onclick="event.stopPropagation();">
-            <button class="btn" id="uploadBtn" onclick="uploadPhoto(); event.stopPropagation();" style="background: #4da6ff; color: #000; font-weight: bold; margin: 0;">Upload to Pi</button>
+            <button class="btn" id="uploadBtn" onclick="uploadPhoto(); event.stopPropagation();" style="background: #4da6ff; color: #000; font-weight: bold; margin: 0;">Upload to Cloud</button>
         </div>
 
         <div class="schedule-row">
@@ -216,20 +216,17 @@
     </div>
 
     <script>
-        // === OLD ANDROID 6 SAFE JAVASCRIPT ===
+        // === ANDROID 6 SAFE JAVASCRIPT ===
         var LAT = "28.6692", LON = "-81.2068";
         var currentImgIdx = 1;
 
-        // Pi Photo API Configuration
-        var PI_BASE_URL = "http://192.168.0.20:3001";
-        var PI_PHOTO_API = PI_BASE_URL + "/photos";
-        var PI_UPLOAD_API = PI_BASE_URL + "/upload"; // Adjust if your endpoint is different
+        // Supabase API Credentials & Config
+        var SUPABASE_URL = 'https://api.croomsconnect.com';
+        var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjE5MDAwMDAwMDB9.XaG-6cRHV8WIfTcuFMHhRmPdUiqn_jm15U4vzHrrt6w';
+        var BUCKET_NAME = 'slideshow-photos';
+
         var photoList = [];
         var lastPhotoCount = 0;
-
-        // API Credentials
-        var PI_URL = 'https://api.croomsconnect.com';
-        var PI_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjE5MDAwMDAwMDB9.XaG-6cRHV8WIfTcuFMHhRmPdUiqn_jm15U4vzHrrt6w';
         var chatMessages = [];
 
         function toggleSettings() {
@@ -290,25 +287,48 @@
             xhr.send();
         }
 
+        // === SUPABASE SPECIFIC - Fetch photos from storage bucket ===
         function fetchPhotos() {
+            var url = SUPABASE_URL + "/storage/v1/object/list/" + BUCKET_NAME;
             var xhr = new XMLHttpRequest();
-            xhr.open("GET", PI_PHOTO_API, true);
+            xhr.open("POST", url, true);
+            
+            xhr.setRequestHeader("apikey", SUPABASE_KEY);
+            xhr.setRequestHeader("Authorization", "Bearer " + SUPABASE_KEY);
+            xhr.setRequestHeader("Content-Type", "application/json");
 
             xhr.onreadystatechange = function () {
                 if (xhr.readyState == 4 && xhr.status == 200) {
                     try {
                         var data = JSON.parse(xhr.responseText);
-                        if (data.length !== lastPhotoCount) {
-                            photoList = data;
-                            lastPhotoCount = data.length;
-                            console.log("New photos detected:", data.length);
+                        var validPhotos = [];
+                        
+                        // Filter out folders and empty placeholders
+                        for (var i = 0; i < data.length; i++) {
+                            if (data[i].name && data[i].name !== ".emptyFolderPlaceholder") {
+                                validPhotos.push(data[i].name);
+                            }
+                        }
+
+                        if (validPhotos.length !== lastPhotoCount) {
+                            photoList = validPhotos;
+                            lastPhotoCount = validPhotos.length;
+                            console.log("New photos detected:", validPhotos.length);
                         }
                     } catch(e) {
                         console.log("Photo list parse error");
                     }
                 }
             };
-            xhr.send();
+
+            // Supabase object list endpoint requires a body payload
+            var body = JSON.stringify({
+                prefix: "",
+                limit: 100,
+                offset: 0,
+                sortBy: { column: "name", order: "asc" }
+            });
+            xhr.send(body);
         }
 
         function updatePhoto() {
@@ -319,7 +339,10 @@
             var current = document.getElementById('photo' + currentImgIdx);
 
             var randomIndex = Math.floor(Math.random() * photoList.length);
-            var newSrc = PI_BASE_URL + "/photos/" + photoList[randomIndex];
+            var photoName = photoList[randomIndex];
+            
+            // Construct the public URL required by Supabase
+            var newSrc = SUPABASE_URL + "/storage/v1/object/public/" + BUCKET_NAME + "/" + encodeURIComponent(photoName);
 
             var tempImg = new Image();
             tempImg.onload = function() {
@@ -362,7 +385,7 @@
             tempImg.src = newSrc;
         }
         
-        // === UPLOAD PHOTO FUNCTION ===
+        // === SUPABASE SPECIFIC - Upload to Storage bucket ===
         function uploadPhoto() {
             var fileInput = document.getElementById('fileInput');
             var uploadBtn = document.getElementById('uploadBtn');
@@ -373,13 +396,19 @@
             }
 
             var file = fileInput.files[0];
-            var formData = new FormData();
             
-            // "photo" is the field name. Change this if your Pi server expects "image" or "file" instead.
-            formData.append("photo", file); 
+            // Clean up the filename and add a timestamp to prevent duplicates in the bucket
+            var safeName = file.name.replace(/[^a-zA-Z0-9.\-]/g, "_");
+            var fileName = Date.now() + "_" + safeName;
+
+            var uploadUrl = SUPABASE_URL + "/storage/v1/object/" + BUCKET_NAME + "/" + fileName;
 
             var xhr = new XMLHttpRequest();
-            xhr.open("POST", PI_UPLOAD_API, true);
+            xhr.open("POST", uploadUrl, true);
+            
+            xhr.setRequestHeader("apikey", SUPABASE_KEY);
+            xhr.setRequestHeader("Authorization", "Bearer " + SUPABASE_KEY);
+            xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
 
             // Progress bar update
             xhr.upload.onprogress = function(event) {
@@ -402,22 +431,23 @@
 
                         // Reset button after 3 seconds
                         setTimeout(function() {
-                            uploadBtn.innerText = "Upload to Pi";
+                            uploadBtn.innerText = "Upload Photo";
                             uploadBtn.style.background = "#4da6ff";
                         }, 3000);
                     } else {
                         uploadBtn.innerText = "Upload Failed";
                         uploadBtn.style.background = "#f44336"; // Turn red
                         setTimeout(function() {
-                            uploadBtn.innerText = "Upload to Pi";
+                            uploadBtn.innerText = "Upload Photo";
                             uploadBtn.style.background = "#4da6ff";
                         }, 3000);
-                        alert("Server returned error code: " + xhr.status);
+                        alert("Server returned error code: " + xhr.status + "\n" + xhr.responseText);
                     }
                 }
             };
 
-            xhr.send(formData);
+            // Send raw file object for Supabase REST
+            xhr.send(file);
         }
 
         function renderMessages() {
@@ -448,14 +478,14 @@
         }
 
         function fetchChat() {
-            if (!PI_URL) return; 
+            if (!SUPABASE_URL) return; 
 
-            var url = PI_URL + "/rest/v1/messages?select=*&order=timestamp.desc&limit=5";
+            var url = SUPABASE_URL + "/rest/v1/messages?select=*&order=timestamp.desc&limit=5";
             var xhr = new XMLHttpRequest();
             xhr.open("GET", url, true);
             
-            xhr.setRequestHeader("apikey", PI_KEY);
-            xhr.setRequestHeader("Authorization", "Bearer " + PI_KEY);
+            xhr.setRequestHeader("apikey", SUPABASE_KEY);
+            xhr.setRequestHeader("Authorization", "Bearer " + SUPABASE_KEY);
             xhr.setRequestHeader("Content-Type", "application/json");
 
             xhr.onreadystatechange = function () {

@@ -311,20 +311,25 @@
             xhr.send();
         }
 
+        // === UPDATED ANDROID 6 SAFE PHOTO LOADER ===
         function updatePhoto() {
-            if (photoList.length === 0) return;
+            if (photoList.length === 0) {
+                console.log("Waiting for photos...");
+                return;
+            }
 
             var nextImgIdx = currentImgIdx === 1 ? 2 : 1;
             var target = document.getElementById('photo' + nextImgIdx);
             var current = document.getElementById('photo' + currentImgIdx);
 
             var randomIndex = Math.floor(Math.random() * photoList.length);
-            var newSrc = PI_BASE_URL + "/photos/" + photoList[randomIndex];
+            
+            // FIX: Safely encode the filename so Android 6 doesn't choke on spaces
+            var safeFilename = encodeURIComponent(photoList[randomIndex]);
+            var newSrc = PI_BASE_URL + "/photos/" + safeFilename;
 
-            var tempImg = new Image();
-            tempImg.onload = function() {
-                target.src = newSrc;
-
+            // FIX: Attach onload directly to the DOM element to prevent Garbage Collection
+            target.onload = function() {
                 var intensity = document.getElementById('animationIntensity').value;
                 var transition = document.getElementById('transitionType').value;
 
@@ -359,7 +364,9 @@
                 target.className += ' active';
                 currentImgIdx = nextImgIdx;
             };
-            tempImg.src = newSrc;
+
+            // Trigger the load
+            target.src = newSrc;
         }
         
         // === UPLOAD PHOTO FUNCTION ===

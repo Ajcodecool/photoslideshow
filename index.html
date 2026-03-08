@@ -3,36 +3,75 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pi Dashboard</title>
+    <title>Pi Dashboard Pro</title>
     <style>
-        * { box-sizing: border-box; }
+        /* Base optimizations for RK3066 */
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
         body, html {
             margin: 0; padding: 0; width: 100%; height: 100%;
             background-color: #000; color: white;
-            font-family: sans-serif;
-            overflow: hidden;
+            font-family: sans-serif; overflow: hidden;
         }
+
         #background-container { position: absolute; width: 100%; height: 100%; z-index: 1; }
+
         .photo {
             position: absolute; width: 100%; height: 100%;
             object-fit: cover; opacity: 0;
-            transition: opacity 1.5s ease-in-out;
+            /* Use transform for hardware acceleration to prevent lag/restarts */
+            transition: opacity 2s ease-in-out;
+            will-change: opacity, transform;
+            transform: scale(1.0);
         }
-        .active { opacity: 1; }
+
+        /* The Slight Animation: Ken Burns Zoom */
+        .active { 
+            opacity: 1; 
+            animation: kenburns 45s linear forwards; 
+        }
+
+        @keyframes kenburns {
+            from { transform: scale(1.0); }
+            to { transform: scale(1.12); }
+        }
+
         #overlay {
             position: absolute; bottom: 0; left: 0; right: 0;
-            background: linear-gradient(transparent, rgba(0,0,0,0.85));
+            background: linear-gradient(transparent, rgba(0,0,0,0.8));
             padding: 50px; z-index: 10;
             display: flex; justify-content: space-between; align-items: flex-end;
+            pointer-events: none; /* Allows taps to hit the body for settings */
         }
-        #time { font-size: 100px; font-weight: bold; line-height: 1; }
-        #date { font-size: 24px; opacity: 0.8; margin-top: 10px; }
+
+        #time { font-size: 100px; font-weight: bold; line-height: 1; text-shadow: 2px 2px 8px rgba(0,0,0,0.5); }
+        #date { font-size: 26px; opacity: 0.8; margin-top: 10px; }
         #weather-container { text-align: right; }
         #temp { font-size: 80px; line-height: 1; }
-        #condition { font-size: 24px; opacity: 0.8; }
+        #condition { font-size: 26px; opacity: 0.8; }
+
+        /* Settings Panel */
+        #settings-panel {
+            position: fixed; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%; max-width: 400px;
+            background: rgba(25, 25, 25, 0.95);
+            border: 2px solid #444; border-radius: 20px;
+            padding: 30px; z-index: 100;
+            display: none; text-align: center;
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+        }
+
+        .btn {
+            display: block; width: 100%; padding: 15px; margin: 10px 0;
+            background: #333; color: white; border: 1px solid #555;
+            border-radius: 10px; font-size: 18px; cursor: pointer;
+        }
+        
+        .btn:active { background: #555; }
     </style>
 </head>
-<body>
+<body onclick="handleTap(event)">
 
     <div id="background-container">
         <img id="photo1" class="photo active" src="https://picsum.photos/1280/800" alt="">
@@ -50,24 +89,40 @@
         </div>
     </div>
 
+    <div id="settings-panel">
+        <h2 style="margin-top:0">Frame Control</h2>
+        <button class="btn" onclick="updatePhoto()">Next Photo</button>
+        <button class="btn" onclick="location.reload()">Refresh Dashboard</button>
+        <button class="btn" onclick="toggleSettings()">Close Settings</button>
+        <p style="font-size: 12px; color: #777; margin-top: 15px;">Dashboard IP: <span id="debug-ip"></span></p>
+    </div>
+
     <script>
-        // --- CONFIGURATION ---
         var LAT = "26.83"; 
         var LON = "-80.12";
+        var currentImgIdx = 1;
 
-        var weatherMap = {
-            0: "Clear Sky", 1: "Mainly Clear", 2: "Partly Cloudy", 3: "Overcast",
-            45: "Fog", 51: "Drizzle", 61: "Rain", 71: "Snow", 95: "Storm"
-        };
+        // Settings Logic
+        function handleTap(e) {
+            // If the user taps a button, don't toggle the whole menu
+            if (e.target.tagName !== 'BUTTON') {
+                toggleSettings();
+            }
+        }
 
-        // 1. Fixed Clock (No modern options that might crash old Chrome)
+        function toggleSettings() {
+            var panel = document.getElementById('settings-panel');
+            var isHidden = panel.style.display === 'none' || panel.style.display === '';
+            panel.style.display = isHidden ? 'block' : 'none';
+            document.getElementById('debug-ip').innerText = window.location.hostname;
+        }
+
         function updateClock() {
             var now = new Date();
             var h = now.getHours();
             var m = now.getMinutes();
             var ampm = h >= 12 ? 'PM' : 'AM';
-            h = h % 12;
-            h = h ? h : 12; 
+            h = h % 12 || 12;
             m = m < 10 ? '0' + m : m;
             
             document.getElementById('time').innerText = h + ':' + m + ' ' + ampm;
@@ -77,7 +132,6 @@
             document.getElementById('date').innerText = days[now.getDay()] + ', ' + months[now.getMonth()] + ' ' + now.getDate();
         }
 
-        // 2. Fixed Weather (Using XMLHttpRequest instead of Fetch for older Android)
         function updateWeather() {
             var url = "http://api.open-meteo.com/v1/forecast?latitude=" + LAT + "&longitude=" + LON + "&current_weather=true&temperature_unit=fahrenheit";
             var xhr = new XMLHttpRequest();
@@ -85,28 +139,25 @@
             xhr.onreadystatechange = function () {
                 if (xhr.readyState == 4 && xhr.status == 200) {
                     var data = JSON.parse(xhr.responseText);
-                    var temp = Math.round(data.current_weather.temperature);
-                    var code = data.current_weather.weathercode;
-                    document.getElementById('temp').innerText = temp + "°";
-                    document.getElementById('condition').innerText = weatherMap[code] || "Cloudy";
+                    var weatherMap = {0: "Clear Sky", 1: "Mainly Clear", 2: "Partly Cloudy", 3: "Overcast", 45: "Fog", 51: "Drizzle", 61: "Rain", 71: "Snow", 95: "Storm"};
+                    document.getElementById('temp').innerText = Math.round(data.current_weather.temperature) + "°";
+                    document.getElementById('condition').innerText = weatherMap[data.current_weather.weathercode] || "Cloudy";
                 }
             };
             xhr.send();
         }
 
-        // 3. Fixed Photo Switcher
-        var currentImgIdx = 1;
         function updatePhoto() {
             var nextImgIdx = currentImgIdx === 1 ? 2 : 1;
             var target = document.getElementById('photo' + nextImgIdx);
             var current = document.getElementById('photo' + currentImgIdx);
 
-            // Use picsum as it's lighter for old frames
             var newSrc = "https://picsum.photos/1280/800?random=" + Math.random();
 
             var tempImg = new Image();
             tempImg.onload = function() {
                 target.src = newSrc;
+                // Reset animation by removing/adding class
                 target.className = "photo active";
                 current.className = "photo";
                 currentImgIdx = nextImgIdx;
@@ -114,15 +165,12 @@
             tempImg.src = newSrc;
         }
 
-        // Initial Start
+        // Initialize
         updateClock();
         updateWeather();
-        updatePhoto();
-
-        // Intervals
         setInterval(updateClock, 1000);
-        setInterval(updateWeather, 600000); // 10 mins
-        setInterval(updatePhoto, 30000);    // 30 seconds
+        setInterval(updateWeather, 600000); 
+        setInterval(updatePhoto, 40000); // 40 seconds allows for the zoom to be visible
     </script>
 </body>
 </html>

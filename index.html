@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Pro + Scheduler + Live Chat (Supabase Edition)</title>
+    <title>Dashboard Pro + Media + Scheduler + Chat</title>
     
     <style>
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -13,17 +13,32 @@
             font-family: sans-serif; overflow: hidden;
         }
 
-        #background-container { position: absolute; width: 100%; height: 100%; z-index: 1; cursor: pointer; }
+        #background-container { position: absolute; width: 100%; height: 100%; z-index: 1; cursor: pointer; background: #000; }
 
-        .photo {
+        .slide {
             position: absolute; width: 100%; height: 100%;
-            object-fit: cover; opacity: 0;
+            opacity: 0; overflow: hidden;
             transition: opacity 2s ease-in-out, transform 45s linear;
             will-change: opacity, transform;
             transform: scale(1.0);
         }
 
-        .active { opacity: 1; }
+        .slide.active { opacity: 1; }
+
+        .bg-blur {
+            position: absolute; width: 100%; height: 100%;
+            object-fit: cover;
+            filter: blur(30px);
+            transform: scale(1.15); /* Hides the harsh unblurred edges */
+            z-index: 1;
+            opacity: 0.5;
+        }
+
+        .fg-image, .fg-video {
+            position: absolute; width: 100%; height: 100%;
+            object-fit: contain;
+            z-index: 2;
+        }
 
         @keyframes kenburns {
             from { transform: scale(1.0); }
@@ -62,6 +77,7 @@
             padding: 25px; z-index: 100;
             display: none; text-align: center;
             box-shadow: 0 0 50px rgba(0,0,0,1);
+            max-height: 90vh; overflow-y: auto;
         }
 
         .btn {
@@ -75,7 +91,7 @@
             margin: 10px 0; padding: 10px; background: #222; border-radius: 8px;
         }
 
-        input[type="time"], select {
+        input[type="time"], input[type="number"], select {
             background: #444; color: white; border: none; padding: 5px; border-radius: 5px;
         }
         
@@ -86,64 +102,37 @@
         /* === CHAT WIDGET STYLES === */
         #chat-widget {
             position: absolute;
-            top: 40px;
-            right: 40px;
-            width: 320px;
+            top: 40px; right: 40px; width: 320px;
             background: rgba(0, 0, 0, 0.55);
-            border-radius: 16px;
-            padding: 20px;
+            border-radius: 16px; padding: 20px;
             z-index: 10;
-            pointer-events: none;
-            display: flex;
-            flex-direction: column;
+            display: flex; flex-direction: column;
             border: 1px solid rgba(255, 255, 255, 0.1);
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            transition: all 0.3s ease;
         }
 
         .chat-header {
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 1.5px;
-            color: rgba(255, 255, 255, 0.6);
+            font-size: 12px; text-transform: uppercase;
+            letter-spacing: 1.5px; color: rgba(255, 255, 255, 0.6);
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            padding-bottom: 8px;
-            margin-bottom: 15px;
+            padding-bottom: 8px; margin-bottom: 15px;
+            display: flex; justify-content: space-between; align-items: center;
         }
 
-        .chat-message {
-            display: flex;
-            align-items: flex-start;
-            margin-bottom: 12px;
-        }
-
+        .chat-message { display: flex; align-items: flex-start; margin-bottom: 12px; }
         .chat-avatar {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            object-fit: cover;
-            background: #444;
-            border: 2px solid rgba(255,255,255,0.2);
-            margin-right: 12px;
+            width: 36px; height: 36px; border-radius: 50%;
+            object-fit: cover; background: #444;
+            border: 2px solid rgba(255,255,255,0.2); margin-right: 12px;
         }
-
-        .chat-content {
-            display: flex;
-            flex-direction: column;
-            width: calc(100% - 48px);
-        }
-
-        .chat-user {
-            font-weight: bold;
-            color: #4da6ff;
-            font-size: 13px;
-            margin-bottom: 3px;
-        }
-
-        .chat-text {
-            color: #eee;
-            font-size: 14px;
-            line-height: 1.4;
-            word-wrap: break-word;
+        .chat-content { display: flex; flex-direction: column; width: calc(100% - 48px); }
+        .chat-user { font-weight: bold; color: #4da6ff; font-size: 13px; margin-bottom: 3px; }
+        .chat-text { color: #eee; font-size: 14px; line-height: 1.4; word-wrap: break-word; }
+        
+        #chat-min-btn {
+            cursor: pointer; font-size: 16px; padding: 0 5px;
+            pointer-events: auto; font-weight: bold;
         }
     </style>
 </head>
@@ -152,13 +141,24 @@
     <div id="night-overlay" onclick="toggleNightMode(false)"></div>
 
     <div id="background-container" onclick="toggleSettings()">
-        <img id="photo1" class="photo active" src="" alt="">
-        <img id="photo2" class="photo" src="" alt="">
+        <div id="slide1" class="slide active">
+            <img class="bg-blur" src="" alt="">
+            <img class="fg-image" src="" alt="">
+            <video class="fg-video" src="" muted playsinline style="display:none;"></video>
+        </div>
+        <div id="slide2" class="slide">
+            <img class="bg-blur" src="" alt="">
+            <img class="fg-image" src="" alt="">
+            <video class="fg-video" src="" muted playsinline style="display:none;"></video>
+        </div>
     </div>
 
     <div id="chat-widget">
-        <div class="chat-header">Live Chat</div>
-        <div id="chat-messages-container">
+        <div class="chat-header">
+            <span>Live Chat</span>
+            <span id="chat-min-btn" onclick="toggleChat()">—</span>
+        </div>
+        <div id="chat-messages-container" style="pointer-events: none;">
             <div style="color: rgba(255,255,255,0.5); font-size: 12px;">Loading messages...</div>
         </div>
     </div>
@@ -178,9 +178,14 @@
         <h3 style="margin: 0 0 15px 0">Frame Control</h3>
 
         <div class="schedule-row" style="flex-direction: column; align-items: stretch; gap: 8px;">
-            <span style="text-align: left;">Upload New Photo:</span>
-            <input type="file" id="fileInput" accept="image/*" onclick="event.stopPropagation();">
-            <button class="btn" id="uploadBtn" onclick="uploadPhoto(); event.stopPropagation();" style="background: #4da6ff; color: #000; font-weight: bold; margin: 0;">Upload to Cloud</button>
+            <span style="text-align: left;">Upload New Media:</span>
+            <input type="file" id="fileInput" accept="image/*,video/mp4,video/webm" onclick="event.stopPropagation();">
+            <button class="btn" id="uploadBtn" onclick="uploadMedia(); event.stopPropagation();" style="background: #4da6ff; color: #000; font-weight: bold; margin: 0;">Upload to Cloud</button>
+        </div>
+
+        <div class="schedule-row">
+            <span>Slide Duration (Sec):</span>
+            <input type="number" id="slideDuration" value="40" min="5" max="300" style="width: 60px;">
         </div>
 
         <div class="schedule-row">
@@ -209,7 +214,7 @@
             </select>
         </div>
 
-        <button class="btn" onclick="updatePhoto(); event.stopPropagation();">Next Photo</button>
+        <button class="btn" onclick="showNextSlide(); event.stopPropagation();">Force Next Slide</button>
         <button class="btn" onclick="toggleNightMode(true); event.stopPropagation();">Manual Night Mode</button>
         <button class="btn" onclick="location.reload(); event.stopPropagation();">Refresh Dashboard</button>
         <button class="btn" onclick="toggleSettings(); event.stopPropagation();">Save & Close</button>
@@ -218,17 +223,21 @@
     <script>
         // === ANDROID 6 SAFE JAVASCRIPT ===
         var LAT = "28.6692", LON = "-81.2068";
-        var currentImgIdx = 1;
-
-        // Supabase API Credentials & Config
+        
+        // Supabase API Credentials
         var SUPABASE_URL = 'https://api.croomsconnect.com';
         var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjE5MDAwMDAwMDB9.XaG-6cRHV8WIfTcuFMHhRmPdUiqn_jm15U4vzHrrt6w';
         var BUCKET_NAME = 'slideshow-photos';
 
+        // State Variables
         var photoList = [];
         var lastPhotoCount = 0;
         var chatMessages = [];
+        var activeIdx = 1;
+        var rotationTimer = null;
+        var chatMinimized = false;
 
+        // UI Toggles
         function toggleSettings() {
             var panel = document.getElementById('settings-panel');
             var isHidden = panel.style.display === 'none' || panel.style.display === '';
@@ -245,6 +254,13 @@
             }
         }
 
+        function toggleChat() {
+            chatMinimized = !chatMinimized;
+            document.getElementById('chat-messages-container').style.display = chatMinimized ? 'none' : 'block';
+            document.getElementById('chat-min-btn').innerText = chatMinimized ? '+' : '—';
+        }
+
+        // Clock & Weather
         function checkSchedule() {
             var now = new Date();
             var h = now.getHours();
@@ -287,7 +303,120 @@
             xhr.send();
         }
 
-        // === SUPABASE SPECIFIC - Fetch photos from storage bucket ===
+        // === MEDIA ENGINE (Preloading & Video Support) ===
+        function isVideo(name) {
+            return name.match(/\.(mp4|webm|ogg)$/i) !== null;
+        }
+
+        function getRandomMediaName() {
+            if (photoList.length === 0) return null;
+            return photoList[Math.floor(Math.random() * photoList.length)];
+        }
+
+        function prepareSlide(slideIdx, mediaName) {
+            if (!mediaName) return;
+            var slide = document.getElementById('slide' + slideIdx);
+            var imgBg = slide.querySelector('.bg-blur');
+            var imgFg = slide.querySelector('.fg-image');
+            var vidFg = slide.querySelector('.fg-video');
+            
+            var url = SUPABASE_URL + "/storage/v1/object/public/" + BUCKET_NAME + "/" + encodeURIComponent(mediaName);
+            slide.setAttribute('data-is-video', isVideo(mediaName));
+
+            if (isVideo(mediaName)) {
+                imgBg.style.display = 'none';
+                imgFg.style.display = 'none';
+                vidFg.style.display = 'block';
+                vidFg.src = url;
+                vidFg.load(); // Preload for Android 6
+            } else {
+                vidFg.style.display = 'none';
+                imgBg.style.display = 'block';
+                imgFg.style.display = 'block';
+                imgBg.src = url;
+                imgFg.src = url;
+            }
+        }
+
+        function queueNext(ms) {
+            clearTimeout(rotationTimer);
+            rotationTimer = setTimeout(showNextSlide, ms);
+        }
+
+        function showNextSlide() {
+            if (photoList.length === 0) {
+                queueNext(5000);
+                return;
+            }
+
+            var currentSlide = document.getElementById('slide' + activeIdx);
+            var nextIdx = activeIdx === 1 ? 2 : 1;
+            var nextSlide = document.getElementById('slide' + nextIdx);
+
+            var intensity = document.getElementById('animationIntensity').value;
+            var transition = document.getElementById('transitionType').value;
+            var defaultDurationSec = parseInt(document.getElementById('slideDuration').value, 10) || 40;
+
+            // Reset transitions for the incoming slide
+            nextSlide.style.transition = 'none';
+            nextSlide.className = 'slide';
+            var forceReflow = nextSlide.offsetWidth; 
+
+            // Apply specific transition
+            if (transition === 'fade') {
+                nextSlide.style.transition = 'opacity 2s ease-in-out, transform 45s linear';
+            } else if (transition === 'slide') {
+                nextSlide.style.transition = 'transform 1s ease-in-out, opacity 1s ease-in-out';
+                nextSlide.style.transform = 'translateX(100%)';
+                setTimeout(function(){ nextSlide.style.transform = 'translateX(0)'; }, 20);
+            } else if (transition === 'zoom') {
+                nextSlide.style.transition = 'transform 5s ease-in-out, opacity 2s ease-in-out';
+                nextSlide.style.transform = 'scale(1.0)';
+            }
+
+            // Apply kenburns scale effect
+            if (intensity === 'intense') {
+                nextSlide.style.animation = 'intenseKenburns 45s linear forwards';
+            } else {
+                nextSlide.style.animation = 'kenburns 45s linear forwards';
+            }
+
+            // Swap visibility
+            nextSlide.className += ' active';
+            currentSlide.className = 'slide';
+
+            // Handle Media Playback & Timers
+            var currentVid = currentSlide.querySelector('video');
+            if (currentVid) currentVid.pause();
+
+            var nextVid = nextSlide.querySelector('video');
+            var isVid = nextSlide.getAttribute('data-is-video') === 'true';
+
+            if (isVid && nextVid) {
+                nextVid.currentTime = 0;
+                var playPromise = nextVid.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(function(e) { console.log('Autoplay prevented', e); });
+                }
+                
+                // Trigger next slide when video ends
+                nextVid.onended = function() { showNextSlide(); };
+                nextVid.onerror = function() { queueNext(defaultDurationSec * 1000); }; // Fallback
+                
+                // Safety net in case onended fails (Max 10 minutes)
+                queueNext(600000); 
+            } else {
+                // Standard image duration
+                queueNext(defaultDurationSec * 1000);
+            }
+
+            // Prepare the slide that just hid for the *next* cycle
+            activeIdx = nextIdx;
+            var prepIdx = activeIdx === 1 ? 2 : 1;
+            prepareSlide(prepIdx, getRandomMediaName());
+        }
+
+        // === SUPABASE SPECIFIC ===
         function fetchPhotos() {
             var url = SUPABASE_URL + "/storage/v1/object/list/" + BUCKET_NAME;
             var xhr = new XMLHttpRequest();
@@ -303,17 +432,24 @@
                         var data = JSON.parse(xhr.responseText);
                         var validPhotos = [];
                         
-                        // Filter out folders and empty placeholders
                         for (var i = 0; i < data.length; i++) {
                             if (data[i].name && data[i].name !== ".emptyFolderPlaceholder") {
                                 validPhotos.push(data[i].name);
                             }
                         }
 
+                        // Live Update: Detect new media
                         if (validPhotos.length !== lastPhotoCount) {
+                            if (lastPhotoCount > 0 && validPhotos.length > lastPhotoCount) {
+                                // A new file was added. Override the currently preloading slide immediately!
+                                var newestMedia = validPhotos[validPhotos.length - 1];
+                                var preloadingIdx = activeIdx === 1 ? 2 : 1;
+                                prepareSlide(preloadingIdx, newestMedia);
+                            }
+                            
                             photoList = validPhotos;
                             lastPhotoCount = validPhotos.length;
-                            console.log("New photos detected:", validPhotos.length);
+                            console.log("Library synced. Total media:", validPhotos.length);
                         }
                     } catch(e) {
                         console.log("Photo list parse error");
@@ -321,83 +457,26 @@
                 }
             };
 
-            // Supabase object list endpoint requires a body payload
+            // Fetch sorting by creation time so newest is always at the end
             var body = JSON.stringify({
                 prefix: "",
                 limit: 100,
                 offset: 0,
-                sortBy: { column: "name", order: "asc" }
+                sortBy: { column: "created_at", order: "asc" } 
             });
             xhr.send(body);
         }
-
-        function updatePhoto() {
-            if (photoList.length === 0) return;
-
-            var nextImgIdx = currentImgIdx === 1 ? 2 : 1;
-            var target = document.getElementById('photo' + nextImgIdx);
-            var current = document.getElementById('photo' + currentImgIdx);
-
-            var randomIndex = Math.floor(Math.random() * photoList.length);
-            var photoName = photoList[randomIndex];
-            
-            // Construct the public URL required by Supabase
-            var newSrc = SUPABASE_URL + "/storage/v1/object/public/" + BUCKET_NAME + "/" + encodeURIComponent(photoName);
-
-            var tempImg = new Image();
-            tempImg.onload = function() {
-                target.src = newSrc;
-
-                var intensity = document.getElementById('animationIntensity').value;
-                var transition = document.getElementById('transitionType').value;
-
-                target.style.transition = 'none';
-                target.className = 'photo';
-                current.className = 'photo';
-                var forceReflow = target.offsetWidth; 
-
-                switch (transition) {
-                    case 'fade':
-                        target.style.transition = 'opacity 2s ease-in-out, transform 45s linear';
-                        break;
-                    case 'slide':
-                        target.style.transition = 'transform 1s ease-in-out, opacity 1s ease-in-out';
-                        target.style.transform = 'translateX(100%)';
-                        setTimeout(function() { 
-                            target.style.transform = 'translateX(0)'; 
-                        }, 20);
-                        break;
-                    case 'zoom':
-                        target.style.transition = 'transform 5s ease-in-out, opacity 2s ease-in-out';
-                        target.style.transform = 'scale(1.0)';
-                        break;
-                }
-
-                if (intensity === 'intense') {
-                    target.style.animation = 'intenseKenburns 45s linear forwards';
-                } else {
-                    target.style.animation = 'kenburns 45s linear forwards';
-                }
-
-                target.className += ' active';
-                currentImgIdx = nextImgIdx;
-            };
-            tempImg.src = newSrc;
-        }
         
-        // === SUPABASE SPECIFIC - Upload to Storage bucket ===
-        function uploadPhoto() {
+        function uploadMedia() {
             var fileInput = document.getElementById('fileInput');
             var uploadBtn = document.getElementById('uploadBtn');
 
             if (fileInput.files.length === 0) {
-                alert("Please select an image file first.");
+                alert("Please select an image or video file first.");
                 return;
             }
 
             var file = fileInput.files[0];
-            
-            // Clean up the filename and add a timestamp to prevent duplicates in the bucket
             var safeName = file.name.replace(/[^a-zA-Z0-9.\-]/g, "_");
             var fileName = Date.now() + "_" + safeName;
 
@@ -410,7 +489,6 @@
             xhr.setRequestHeader("Authorization", "Bearer " + SUPABASE_KEY);
             xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
 
-            // Progress bar update
             xhr.upload.onprogress = function(event) {
                 if (event.lengthComputable) {
                     var percentComplete = Math.round((event.loaded / event.total) * 100);
@@ -422,37 +500,32 @@
                 if (xhr.readyState == 4) {
                     if (xhr.status == 200 || xhr.status == 201) {
                         uploadBtn.innerText = "Upload Success!";
-                        uploadBtn.style.background = "#4caf50"; // Turn green
-                        fileInput.value = ""; // Clear input
+                        uploadBtn.style.background = "#4caf50";
+                        fileInput.value = ""; 
                         
-                        // Immediately fetch the new list and show the new photo
+                        // Refetch library so it auto-injects into the rotation
                         fetchPhotos();
-                        setTimeout(updatePhoto, 1500); 
 
-                        // Reset button after 3 seconds
                         setTimeout(function() {
-                            uploadBtn.innerText = "Upload Photo";
+                            uploadBtn.innerText = "Upload to Cloud";
                             uploadBtn.style.background = "#4da6ff";
                         }, 3000);
                     } else {
                         uploadBtn.innerText = "Upload Failed";
-                        uploadBtn.style.background = "#f44336"; // Turn red
+                        uploadBtn.style.background = "#f44336";
                         setTimeout(function() {
-                            uploadBtn.innerText = "Upload Photo";
+                            uploadBtn.innerText = "Upload to Cloud";
                             uploadBtn.style.background = "#4da6ff";
                         }, 3000);
-                        alert("Server returned error code: " + xhr.status + "\n" + xhr.responseText);
                     }
                 }
             };
-
-            // Send raw file object for Supabase REST
             xhr.send(file);
         }
 
+        // === CHAT SYSTEM ===
         function renderMessages() {
             var container = document.getElementById('chat-messages-container');
-            
             if (chatMessages.length === 0) {
                 container.innerHTML = '<div style="color: rgba(255,255,255,0.5); font-size: 12px;">No messages yet.</div>';
                 return;
@@ -473,7 +546,6 @@
                                 '</div>' +
                               '</div>';
             }
-            
             container.innerHTML = htmlString;
         }
 
@@ -491,30 +563,38 @@
             xhr.onreadystatechange = function () {
                 if (xhr.readyState == 4 && xhr.status == 200) {
                     try {
-                        var data = JSON.parse(xhr.responseText);
-                        chatMessages = data.reverse(); 
+                        chatMessages = JSON.parse(xhr.responseText).reverse(); 
                         renderMessages();
-                    } catch (e) {
-                        console.error("Error parsing chat data.");
-                    }
+                    } catch (e) {}
                 }
             };
             xhr.send();
         }
 
-        // Initialize Everything
+        // === BOOT SEQUENCE ===
+        function initSlideshow() {
+            if (photoList.length === 0) {
+                setTimeout(initSlideshow, 1000); // Wait for fetchPhotos
+                return;
+            }
+            
+            // Preload both slots initially
+            prepareSlide(1, getRandomMediaName());
+            prepareSlide(2, getRandomMediaName());
+            
+            // Kickstart the cycle
+            setTimeout(showNextSlide, 500);
+        }
+
         updateClock();
         updateWeather();
         fetchChat(); 
         fetchPhotos();
-        
-        // Initial photo load right after fetching the list
-        setTimeout(updatePhoto, 1000);
+        initSlideshow();
         
         setInterval(updateClock, 1000);
         setInterval(updateWeather, 600000);
-        setInterval(updatePhoto, 40000);
-        setInterval(fetchPhotos, 5000);
+        setInterval(fetchPhotos, 5000); // Checks for new uploads frequently
         setInterval(fetchChat, 10000); 
 
     </script>

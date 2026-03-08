@@ -3,10 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pi Dashboard Pro + Scheduler + Live Chat</title>
+    <title>Pi Dashboard Pro + Scheduler + Live Chat (Android 6 Safe)</title>
     
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-
     <style>
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body, html {
@@ -88,15 +86,12 @@
             right: 40px;
             width: 320px;
             background: rgba(0, 0, 0, 0.55);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
             border-radius: 16px;
             padding: 20px;
             z-index: 10;
-            pointer-events: none; /* Allows clicks to pass through to the background */
+            pointer-events: none;
             display: flex;
             flex-direction: column;
-            gap: 15px;
             border: 1px solid rgba(255, 255, 255, 0.1);
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
@@ -108,14 +103,13 @@
             color: rgba(255, 255, 255, 0.6);
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             padding-bottom: 8px;
-            margin-bottom: 5px;
+            margin-bottom: 15px;
         }
 
         .chat-message {
             display: flex;
-            gap: 12px;
             align-items: flex-start;
-            animation: fadeIn 0.5s ease-out;
+            margin-bottom: 12px;
         }
 
         .chat-avatar {
@@ -125,6 +119,7 @@
             object-fit: cover;
             background: #444;
             border: 2px solid rgba(255,255,255,0.2);
+            margin-right: 12px;
         }
 
         .chat-content {
@@ -135,7 +130,7 @@
 
         .chat-user {
             font-weight: bold;
-            color: #4da6ff; /* A nice bright blue for usernames */
+            color: #4da6ff;
             font-size: 13px;
             margin-bottom: 3px;
         }
@@ -147,16 +142,10 @@
             word-wrap: break-word;
         }
 
-        /* Constrain any images sent in chat so they don't break the widget */
         .chat-text img {
             max-width: 100%;
             border-radius: 8px;
             margin-top: 5px;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
         }
     </style>
 </head>
@@ -170,7 +159,7 @@
     </div>
 
     <div id="chat-widget">
-        <div class="chat-header"><i class="fa-solid fa-messages"></i> Live Chat</div>
+        <div class="chat-header">Live Chat</div>
         <div id="chat-messages-container">
             <div style="color: rgba(255,255,255,0.5); font-size: 12px;">Loading messages...</div>
         </div>
@@ -223,9 +212,16 @@
     </div>
 
     <script>
-        // === ORIGINAL DASHBOARD LOGIC ===
+        // === OLD ANDROID 6 SAFE JAVASCRIPT ===
+        // We strictly use 'var' instead of 'let/const' and basic functions instead of arrow functions (=>)
+
         var LAT = "28.6692", LON = "-81.2068";
         var currentImgIdx = 1;
+
+        // 🚨 YOUR SUPABASE CREDENTIALS HERE 🚨
+        var SUPABASE_URL = 'YOUR_SUPABASE_URL_HERE';
+        var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjE5MDAwMDAwMDB9.XaG-6cRHV8WIfTcuFMHhRmPdUiqn_jm15U4vzHrrt6w';
+        var chatMessages = [];
 
         function toggleSettings() {
             var panel = document.getElementById('settings-panel');
@@ -245,7 +241,9 @@
 
         function checkSchedule() {
             var now = new Date();
-            var currentTime = now.getHours() + ":" + (now.getMinutes() < 10 ? '0' : '') + now.getMinutes();
+            var h = now.getHours();
+            var m = now.getMinutes();
+            var currentTime = h + ":" + (m < 10 ? '0' : '') + m;
             var sleep = document.getElementById('sleepTime').value;
             var wake = document.getElementById('wakeTime').value;
 
@@ -299,7 +297,7 @@
                 target.style.transition = 'none';
                 target.className = 'photo';
                 current.className = 'photo';
-                void target.offsetWidth; 
+                var forceReflow = target.offsetWidth; 
 
                 switch (transition) {
                     case 'fade':
@@ -308,7 +306,9 @@
                     case 'slide':
                         target.style.transition = 'transform 1s ease-in-out, opacity 1s ease-in-out';
                         target.style.transform = 'translateX(100%)';
-                        setTimeout(() => target.style.transform = 'translateX(0)', 20);
+                        setTimeout(function() { 
+                            target.style.transform = 'translateX(0)'; 
+                        }, 20);
                         break;
                     case 'zoom':
                         target.style.transition = 'transform 5s ease-in-out, opacity 2s ease-in-out';
@@ -328,89 +328,76 @@
             tempImg.src = newSrc;
         }
 
-        // === SUPABASE CHAT INTEGRATION LOGIC ===
-        
-        // 🚨 IMPORTANT: REPLACE THESE WITH YOUR ACTUAL SUPABASE CREDENTIALS 🚨
-        const SUPABASE_URL = 'https://api.croomsconnect.com';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjE5MDAwMDAwMDB9.XaG-6cRHV8WIfTcuFMHhRmPdUiqn_jm15U4vzHrrt6w';
-        
-        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        let chatMessages = [];
+        // === ANDROID 6 COMPATIBLE SUPABASE FETCHING ===
+        // We use old-school XMLHttpRequest instead of Fetch or the modern Supabase Client.
 
         function renderMessages() {
-            const container = document.getElementById('chat-messages-container');
+            var container = document.getElementById('chat-messages-container');
+            
             if (chatMessages.length === 0) {
                 container.innerHTML = '<div style="color: rgba(255,255,255,0.5); font-size: 12px;">No messages yet.</div>';
                 return;
             }
 
-            container.innerHTML = chatMessages.map(msg => {
-                // Determine fallback avatar if none exists
-                const avatar = msg.avatar_url || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(msg.username || 'U') + '&background=random';
-                const username = msg.username || 'Unknown User';
-                
-                return `
-                    <div class="chat-message" id="msg-${msg.id}">
-                        <img class="chat-avatar" src="${avatar}" alt="${username}'s avatar" onerror="this.src='https://ui-avatars.com/api/?name=U&background=random'">
-                        <div class="chat-content">
-                            <span class="chat-user">${username}</span>
-                            <span class="chat-text">${msg.is_deleted ? '<i>Message deleted</i>' : msg.message}</span>
-                        </div>
-                    </div>
-                `;
-            }).join('');
+            var htmlString = "";
+            for (var i = 0; i < chatMessages.length; i++) {
+                var msg = chatMessages[i];
+                var username = msg.username ? msg.username : 'Unknown User';
+                var avatar = msg.avatar_url ? msg.avatar_url : 'https://ui-avatars.com/api/?name=' + encodeURIComponent(username) + '&background=random';
+                var text = msg.is_deleted ? '<i>Message deleted</i>' : msg.message;
+
+                htmlString += '<div class="chat-message" id="msg-' + msg.id + '">' +
+                                '<img class="chat-avatar" src="' + avatar + '" onerror="this.src=\'https://ui-avatars.com/api/?name=U&background=random\'">' +
+                                '<div class="chat-content">' +
+                                    '<span class="chat-user">' + username + '</span>' +
+                                    '<span class="chat-text">' + text + '</span>' +
+                                '</div>' +
+                              '</div>';
+            }
+            
+            container.innerHTML = htmlString;
         }
 
-        async function initChat() {
-            try {
-                // 1. Fetch initial last 5 messages
-                const { data, error } = await supabaseClient
-                    .from('messages')
-                    .select('*')
-                    .order('timestamp', { ascending: false })
-                    .limit(5);
+        function fetchChat() {
+            if (SUPABASE_URL === 'https://api.croomsconnect.com') return; // Prevent errors if keys aren't set
 
-                if (error) throw error;
+            var url = SUPABASE_URL + "/rest/v1/messages?select=*&order=timestamp.desc&limit=5";
+            var xhr = new XMLHttpRequest();
+            xhr.open("GET", url, true);
+            
+            // Supabase Authentication Headers
+            xhr.setRequestHeader("apikey", SUPABASE_ANON_KEY);
+            xhr.setRequestHeader("Authorization", "Bearer " + SUPABASE_ANON_KEY);
+            xhr.setRequestHeader("Content-Type", "application/json");
 
-                if (data) {
-                    // Reverse to show oldest at top, newest at bottom of the list
-                    chatMessages = data.reverse(); 
-                    renderMessages();
-                }
-
-                // 2. Subscribe to real-time new messages
-                supabaseClient.channel('public:messages')
-                    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
-                        chatMessages.push(payload.new);
-                        // Keep only the last 5
-                        if (chatMessages.length > 5) chatMessages.shift();
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState == 4 && xhr.status == 200) {
+                    try {
+                        var data = JSON.parse(xhr.responseText);
+                        // Reverse the array so the newest message is at the bottom
+                        chatMessages = data.reverse(); 
                         renderMessages();
-                    })
-                    // Optional: Listen for deletes/edits if you want the dashboard to reflect moderation
-                    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, (payload) => {
-                        const index = chatMessages.findIndex(m => m.id === payload.new.id);
-                        if (index !== -1) {
-                            chatMessages[index] = payload.new;
-                            renderMessages();
-                        }
-                    })
-                    .subscribe();
-
-            } catch (err) {
-                console.error("Failed to load chat:", err);
-                document.getElementById('chat-messages-container').innerHTML = 
-                    '<div style="color: #ff6b6b; font-size: 12px;">Failed to connect to chat database.</div>';
-            }
+                    } catch (e) {
+                        console.error("Error parsing chat data.");
+                    }
+                }
+            };
+            xhr.send();
         }
 
         // Initialize Everything
         updateClock();
         updateWeather();
-        initChat(); // Start Chat Connection
+        fetchChat(); 
         
         setInterval(updateClock, 1000);
         setInterval(updateWeather, 600000);
         setInterval(updatePhoto, 40000);
+        
+        // Instead of WebSockets, we poll the REST API every 10 seconds for new messages. 
+        // This is MUCH safer for the Rockchip CPU memory limits.
+        setInterval(fetchChat, 10000); 
+
     </script>
 </body>
 </html>

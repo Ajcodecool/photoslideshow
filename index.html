@@ -15,30 +15,15 @@
 
         #background-container { position: absolute; width: 100%; height: 100%; z-index: 1; cursor: pointer; }
 
-        /* Updated photo class with Android 6 WebKit prefixes and GPU acceleration */
+        /* Simplified photo class. Transitions are now explicitly handled by JS for older GPU support */
         .photo {
             position: absolute; width: 100%; height: 100%;
             object-fit: cover; opacity: 0;
-            transition: opacity 2s ease-in-out, transform 45s linear;
-            -webkit-transition: opacity 2s ease-in-out, -webkit-transform 45s linear;
-            will-change: opacity, transform;
-            
             /* Force GPU hardware acceleration on RK3066 */
             -webkit-backface-visibility: hidden;
-            -webkit-transform: translateZ(0);
+            -webkit-transform: translateZ(0) scale(1.0);
             transform: translateZ(0) scale(1.0);
-        }
-
-        .active { opacity: 1; }
-
-        @keyframes kenburns {
-            from { transform: scale(1.0); }
-            to { transform: scale(1.12); }
-        }
-
-        @keyframes intenseKenburns {
-            from { transform: scale(1.0); }
-            to { transform: scale(1.25); }
+            will-change: opacity, transform;
         }
 
         #overlay {
@@ -158,7 +143,7 @@
     <div id="night-overlay" onclick="toggleNightMode(false)"></div>
 
     <div id="background-container" onclick="toggleSettings()">
-        <img id="photo1" class="photo active" src="" alt="">
+        <img id="photo1" class="photo" src="" alt="" style="opacity: 1;">
         <img id="photo2" class="photo" src="" alt="">
     </div>
 
@@ -225,16 +210,14 @@
         // === UPDATED ANDROID 6 SAFE JAVASCRIPT ===
         var LAT = "28.6692", LON = "-81.2068";
         var currentImgIdx = 1;
-        var initialPhotoLoaded = false; // Tracks if we've successfully loaded the first image
+        var initialPhotoLoaded = false;
 
-        // Pi Photo API Configuration
         var PI_BASE_URL = "http://192.168.0.20:3001";
         var PI_PHOTO_API = PI_BASE_URL + "/photos";
         var PI_UPLOAD_API = PI_BASE_URL + "/upload";
         var photoList = [];
         var lastPhotoCount = 0;
 
-        // API Credentials
         var PI_URL = 'https://api.croomsconnect.com';
         var PI_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjE5MDAwMDAwMDB9.XaG-6cRHV8WIfTcuFMHhRmPdUiqn_jm15U4vzHrrt6w';
         var chatMessages = [];
@@ -312,7 +295,6 @@
                                 console.log("New photos detected:", data.length);
                             }
                             
-                            // FIX: Trigger the first photo load ONLY after we know we have data
                             if (!initialPhotoLoaded && photoList.length > 0) {
                                 initialPhotoLoaded = true;
                                 updatePhoto();
@@ -339,12 +321,11 @@
             var current = document.getElementById('photo' + currentImgIdx);
 
             var randomIndex = Math.floor(Math.random() * photoList.length);
+            var safeFilename = encodeURI(photoList[randomIndex]); // Using encodeURI to respect folder slashes
             
-            // FIX: Use encodeURI instead of encodeURIComponent so slashes in folders don't break
-            var safeFilename = encodeURI(photoList[randomIndex]);
-            var newSrc = PI_BASE_URL + "/photos/" + safeFilename;
+            // FIX: Added cache buster (?t=...) so Android 6 WebKit always fires the onload event
+            var newSrc = PI_BASE_URL + "/photos/" + safeFilename + "?t=" + new Date().getTime();
 
-            // FIX: Add onerror handler. If a photo fails, try another one in 5 seconds.
             target.onerror = function() {
                 console.log("Failed to load image: " + newSrc);
                 setTimeout(updatePhoto, 5000); 
@@ -354,47 +335,46 @@
                 var intensity = document.getElementById('animationIntensity').value;
                 var transition = document.getElementById('transitionType').value;
 
-                // Strip classes to reset animations safely for older memory management
+                // 1. Instantly strip transitions to reset the position silently
                 target.style.transition = 'none';
                 target.style.webkitTransition = 'none';
-                target.className = 'photo';
-                current.className = 'photo';
+                target.style.opacity = '0';
                 
-                // Force layout recalculation
-                var forceReflow = target.offsetWidth; 
-
-                switch (transition) {
-                    case 'fade':
-                        target.style.transition = 'opacity 2s ease-in-out, transform 45s linear';
-                        target.style.webkitTransition = 'opacity 2s ease-in-out, -webkit-transform 45s linear';
-                        break;
-                    case 'slide':
-                        target.style.transition = 'transform 1s ease-in-out, opacity 1s ease-in-out';
-                        target.style.webkitTransition = '-webkit-transform 1s ease-in-out, opacity 1s ease-in-out';
-                        target.style.transform = 'translateX(100%)';
-                        target.style.webkitTransform = 'translateX(100%)';
-                        setTimeout(function() { 
-                            target.style.transform = 'translateX(0)'; 
-                            target.style.webkitTransform = 'translateX(0)'; 
-                        }, 20);
-                        break;
-                    case 'zoom':
-                        target.style.transition = 'transform 5s ease-in-out, opacity 2s ease-in-out';
-                        target.style.webkitTransition = '-webkit-transform 5s ease-in-out, opacity 2s ease-in-out';
-                        target.style.transform = 'scale(1.0)';
-                        target.style.webkitTransform = 'scale(1.0)';
-                        break;
-                }
-
-                if (intensity === 'intense') {
-                    target.style.animation = 'intenseKenburns 45s linear forwards';
-                    target.style.webkitAnimation = 'intenseKenburns 45s linear forwards';
+                if (transition === 'slide') {
+                    target.style.transform = 'translateX(100%) scale(1.0)';
+                    target.style.webkitTransform = 'translateX(100%) scale(1.0)';
                 } else {
-                    target.style.animation = 'kenburns 45s linear forwards';
-                    target.style.webkitAnimation = 'kenburns 45s linear forwards';
+                    target.style.transform = 'translateZ(0) scale(1.0)';
+                    target.style.webkitTransform = 'translateZ(0) scale(1.0)';
                 }
 
-                target.className += ' active';
+                // 2. Force DOM layout recalculation (CRITICAL for old WebKit)
+                void target.offsetWidth; 
+
+                // 3. Define the final animation states using JS logic instead of @keyframes
+                var scaleTarget = intensity === 'intense' ? 1.25 : 1.12;
+                var finalTransform = 'translateZ(0) scale(1.0)';
+
+                if (transition === 'fade' || transition === 'zoom') {
+                    target.style.transition = 'opacity 2s ease-in-out, transform 45s linear';
+                    target.style.webkitTransition = 'opacity 2s ease-in-out, -webkit-transform 45s linear';
+                    finalTransform = 'translateZ(0) scale(' + scaleTarget + ')';
+                } else if (transition === 'slide') {
+                    target.style.transition = 'transform 1s ease-in-out, opacity 1s ease-in-out';
+                    target.style.webkitTransition = '-webkit-transform 1s ease-in-out, opacity 1s ease-in-out';
+                    finalTransform = 'translateX(0) scale(1.0)';
+                }
+
+                // 4. Trigger the new animation 
+                target.style.opacity = '1';
+                target.style.transform = finalTransform;
+                target.style.webkitTransform = finalTransform;
+
+                // 5. Fade out the old image safely
+                current.style.transition = 'opacity 2s ease-in-out';
+                current.style.webkitTransition = 'opacity 2s ease-in-out';
+                current.style.opacity = '0';
+
                 currentImgIdx = nextImgIdx;
             };
 

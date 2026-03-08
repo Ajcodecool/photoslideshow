@@ -17,13 +17,22 @@
         .photo {
             position: absolute; width: 100%; height: 100%;
             object-fit: cover; opacity: 0;
-            transition: opacity 2s ease-in-out;
+            transition: opacity 2s ease-in-out, transform 45s linear;
             will-change: opacity, transform;
             transform: scale(1.0);
         }
 
-        .active { opacity: 1; animation: kenburns 45s linear forwards; }
-        @keyframes kenburns { from { transform: scale(1.0); } to { transform: scale(1.12); } }
+        .active { opacity: 1; }
+
+        @keyframes kenburns {
+            from { transform: scale(1.0); }
+            to { transform: scale(1.12); }
+        }
+
+        @keyframes intenseKenburns {
+            from { transform: scale(1.0); }
+            to { transform: scale(1.25); }
+        }
 
         #overlay {
             position: absolute; bottom: 0; left: 0; right: 0;
@@ -38,7 +47,6 @@
         #temp { font-size: 80px; line-height: 1; }
         #condition { font-size: 26px; opacity: 0.8; }
 
-        /* Night Mode Curtain */
         #night-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: black; z-index: 500; display: none;
@@ -66,7 +74,7 @@
             margin: 10px 0; padding: 10px; background: #222; border-radius: 8px;
         }
 
-        input[type="time"] {
+        input[type="time"], select {
             background: #444; color: white; border: none; padding: 5px; border-radius: 5px;
         }
     </style>
@@ -93,7 +101,7 @@
 
     <div id="settings-panel">
         <h3 style="margin: 0 0 15px 0">Frame Control</h3>
-        
+
         <div class="schedule-row">
             <span>Sleep Time:</span>
             <input type="time" id="sleepTime" value="22:00">
@@ -103,6 +111,23 @@
             <input type="time" id="wakeTime" value="07:00">
         </div>
 
+        <div class="schedule-row">
+            <span>Animation Intensity:</span>
+            <select id="animationIntensity">
+                <option value="normal" selected>Normal</option>
+                <option value="intense">Intense</option>
+            </select>
+        </div>
+
+        <div class="schedule-row">
+            <span>Transition Type:</span>
+            <select id="transitionType">
+                <option value="fade" selected>Fade</option>
+                <option value="slide">Slide</option>
+                <option value="zoom">Zoom</option>
+            </select>
+        </div>
+
         <button class="btn" onclick="updatePhoto(); event.stopPropagation();">Next Photo</button>
         <button class="btn" onclick="toggleNightMode(true); event.stopPropagation();">Manual Night Mode</button>
         <button class="btn" onclick="location.reload(); event.stopPropagation();">Refresh Dashboard</button>
@@ -110,7 +135,6 @@
     </div>
 
     <script>
-        // Oviedo, FL coordinates
         var LAT = "28.6692", LON = "-81.2068";
         var currentImgIdx = 1;
 
@@ -136,12 +160,8 @@
             var sleep = document.getElementById('sleepTime').value;
             var wake = document.getElementById('wakeTime').value;
 
-            // Auto-On / Auto-Off logic
-            if (currentTime === sleep) {
-                toggleNightMode(true);
-            } else if (currentTime === wake) {
-                toggleNightMode(false);
-            }
+            if (currentTime === sleep) toggleNightMode(true);
+            else if (currentTime === wake) toggleNightMode(false);
         }
 
         function updateClock() {
@@ -151,12 +171,12 @@
             h = h % 12 || 12;
             m = m < 10 ? '0' + m : m;
             document.getElementById('time').innerText = h + ':' + m + ' ' + ampm;
-            
+
             var days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
             var months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
             document.getElementById('date').innerText = days[now.getDay()] + ', ' + months[now.getMonth()] + ' ' + now.getDate();
-            
-            checkSchedule(); // Check every minute
+
+            checkSchedule();
         }
 
         function updateWeather() {
@@ -183,8 +203,40 @@
             var tempImg = new Image();
             tempImg.onload = function() {
                 target.src = newSrc;
-                target.className = "photo active";
-                current.className = "photo";
+
+                // Reset transitions
+                var intensity = document.getElementById('animationIntensity').value;
+                var transition = document.getElementById('transitionType').value;
+
+                target.style.transition = 'none';
+                target.className = 'photo';
+                current.className = 'photo';
+                void target.offsetWidth; // force reflow
+
+                // Apply transition type
+                switch (transition) {
+                    case 'fade':
+                        target.style.transition = 'opacity 2s ease-in-out, transform 45s linear';
+                        break;
+                    case 'slide':
+                        target.style.transition = 'transform 1s ease-in-out, opacity 1s ease-in-out';
+                        target.style.transform = 'translateX(100%)';
+                        setTimeout(() => target.style.transform = 'translateX(0)', 20);
+                        break;
+                    case 'zoom':
+                        target.style.transition = 'transform 5s ease-in-out, opacity 2s ease-in-out';
+                        target.style.transform = 'scale(1.0)';
+                        break;
+                }
+
+                // Apply animation intensity
+                if (intensity === 'intense') {
+                    target.style.animation = 'intenseKenburns 45s linear forwards';
+                } else {
+                    target.style.animation = 'kenburns 45s linear forwards';
+                }
+
+                target.className += ' active';
                 currentImgIdx = nextImgIdx;
             };
             tempImg.src = newSrc;
@@ -193,8 +245,8 @@
         // Initialize
         updateClock();
         updateWeather();
-        setInterval(updateClock, 1000); // Clock updates every sec, schedule checks every min
-        setInterval(updateWeather, 600000); 
+        setInterval(updateClock, 1000);
+        setInterval(updateWeather, 600000);
         setInterval(updatePhoto, 40000);
     </script>
 </body>

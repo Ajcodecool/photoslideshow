@@ -3,113 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pi Dashboard Pro (Android 6 Safe + Debugger)</title>
-    
+    <title>Pi Dashboard Legacy</title>
     <style>
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body, html {
-            margin: 0; padding: 0; width: 100%; height: 100%;
-            background-color: #000; color: white;
-            font-family: sans-serif; overflow: hidden;
-        }
-
-        #background-container { position: absolute; width: 100%; height: 100%; z-index: 1; cursor: pointer; }
-
-        .photo {
-            position: absolute; width: 100%; height: 100%;
-            object-fit: cover; 
-            /* Trick WebKit into rendering the element in memory by not using pure 0 */
-            opacity: 0.01; 
-            /* Force true GPU hardware acceleration using 3D transforms */
-            -webkit-backface-visibility: hidden;
-            -webkit-perspective: 1000;
-            -webkit-transform: translate3d(0, 0, 0) scale(1.0);
-            transform: translate3d(0, 0, 0) scale(1.0);
-        }
-
-        /* === DEBUGGER CONSOLE === */
-        #debug-log {
-            position: absolute; top: 10px; left: 10px; z-index: 9999;
-            background: rgba(0,0,0,0.8); color: #00ff00;
-            padding: 10px; font-family: monospace; font-size: 12px;
-            width: 300px; max-height: 200px; overflow-y: auto;
-            border: 1px solid #00ff00; pointer-events: none;
-        }
-
-        #overlay {
-            position: absolute; bottom: 0; left: 0; right: 0;
-            background: linear-gradient(transparent, rgba(0,0,0,0.8));
-            padding: 50px; z-index: 10;
-            display: flex; justify-content: space-between; align-items: flex-end;
-            pointer-events: none; 
-        }
-
-        #time { font-size: 100px; font-weight: bold; line-height: 1; text-shadow: 2px 2px 8px rgba(0,0,0,0.5); }
-        #date { font-size: 26px; opacity: 0.8; margin-top: 10px; }
-        #temp { font-size: 80px; line-height: 1; }
-        #condition { font-size: 26px; opacity: 0.8; }
-
-        #night-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: black; z-index: 500; display: none;
-        }
-
-        #settings-panel {
-            position: fixed; top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            width: 85%; max-width: 450px;
-            background: rgba(25, 25, 25, 0.98);
-            border: 2px solid #444; border-radius: 20px;
-            padding: 25px; z-index: 100;
-            display: none; text-align: center;
-            box-shadow: 0 0 50px rgba(0,0,0,1);
-        }
-
-        .btn {
-            display: block; width: 100%; padding: 12px; margin: 8px 0;
-            background: #333; color: white; border: 1px solid #555;
-            border-radius: 10px; font-size: 16px; cursor: pointer;
-        }
-
-        .schedule-row {
-            display: flex; justify-content: space-between; align-items: center;
-            margin: 10px 0; padding: 10px; background: #222; border-radius: 8px;
-        }
-
-        input[type="time"], select { background: #444; color: white; border: none; padding: 5px; border-radius: 5px; }
-        input[type="file"] { background: #444; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer; }
-
-        #chat-widget {
-            position: absolute; top: 40px; right: 40px; width: 320px;
-            background: rgba(0, 0, 0, 0.55); border-radius: 16px;
-            padding: 20px; z-index: 10; pointer-events: none;
-            display: flex; flex-direction: column;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        .chat-header { font-size: 12px; text-transform: uppercase; color: rgba(255, 255, 255, 0.6); border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 8px; margin-bottom: 15px; }
-        .chat-message { display: flex; align-items: flex-start; margin-bottom: 12px; }
-        .chat-avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: #444; margin-right: 12px; }
-        .chat-content { display: flex; flex-direction: column; width: calc(100% - 48px); }
-        .chat-user { font-weight: bold; color: #4da6ff; font-size: 13px; margin-bottom: 3px; }
-        .chat-text { color: #eee; font-size: 14px; line-height: 1.4; word-wrap: break-word; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; color: #fff; font-family: sans-serif; overflow: hidden; }
+        #background-container { position: absolute; width: 100%; height: 100%; z-index: 1; }
+        .photo { position: absolute; width: 100%; height: 100%; object-fit: cover; opacity: 0.01; -webkit-transform: translate3d(0,0,0); }
+        #debug-log { position: absolute; top: 0; left: 0; z-index: 999; background: rgba(0,0,0,0.7); color: #0f0; font-family: monospace; font-size: 11px; width: 100%; max-height: 120px; overflow: hidden; padding: 5px; pointer-events: none; border-bottom: 1px solid #0f0; }
+        #overlay { position: absolute; bottom: 0; left: 0; width: 100%; padding: 40px; z-index: 10; background: linear-gradient(transparent, rgba(0,0,0,0.8)); display: flex; justify-content: space-between; align-items: flex-end; }
+        #time { font-size: 80px; font-weight: bold; }
+        #weather-container { text-align: right; }
+        #temp { font-size: 60px; }
     </style>
 </head>
 <body>
 
-    <div id="debug-log">System Initializing...<br></div>
+    <div id="debug-log">System Booting...</div>
 
-    <div id="night-overlay" onclick="toggleNightMode(false)"></div>
-
-    <div id="background-container" onclick="toggleSettings()">
-        <img id="photo1" class="photo" src="" alt="" style="opacity: 1;">
-        <img id="photo2" class="photo" src="" alt="">
-    </div>
-
-    <div id="chat-widget">
-        <div class="chat-header">Live Chat</div>
-        <div id="chat-messages-container">
-            <div style="color: rgba(255,255,255,0.5); font-size: 12px;">Loading messages...</div>
-        </div>
+    <div id="background-container">
+        <img id="photo1" class="photo" src="" style="opacity: 1;">
+        <img id="photo2" class="photo" src="">
     </div>
 
     <div id="overlay">
@@ -119,241 +32,123 @@
         </div>
         <div id="weather-container">
             <div id="temp">--°</div>
-            <div id="condition">Updating...</div>
+            <div id="condition">--</div>
         </div>
-    </div>
-
-    <div id="settings-panel">
-        <h3 style="margin: 0 0 15px 0">Frame Control</h3>
-        <div class="schedule-row" style="flex-direction: column; align-items: stretch; gap: 8px;">
-            <span style="text-align: left;">Upload New Photo:</span>
-            <input type="file" id="fileInput" accept="image/*" onclick="event.stopPropagation();">
-            <button class="btn" id="uploadBtn" onclick="uploadPhoto(); event.stopPropagation();" style="background: #4da6ff; color: #000; font-weight: bold; margin: 0;">Upload to Pi</button>
-        </div>
-        <div class="schedule-row"><span>Sleep Time:</span><input type="time" id="sleepTime" value="22:00"></div>
-        <div class="schedule-row"><span>Wake Time:</span><input type="time" id="wakeTime" value="07:00"></div>
-        <div class="schedule-row">
-            <span>Animation:</span>
-            <select id="animationIntensity"><option value="normal" selected>Normal</option><option value="intense">Intense</option></select>
-        </div>
-        <div class="schedule-row">
-            <span>Transition:</span>
-            <select id="transitionType"><option value="fade" selected>Fade</option><option value="slide">Slide</option><option value="zoom">Zoom</option></select>
-        </div>
-        <button class="btn" onclick="updatePhoto(); event.stopPropagation();">Next Photo</button>
-        <button class="btn" onclick="toggleNightMode(true); event.stopPropagation();">Manual Night Mode</button>
-        <button class="btn" onclick="location.reload(); event.stopPropagation();">Refresh Dashboard</button>
-        <button class="btn" onclick="toggleSettings(); event.stopPropagation();">Save & Close</button>
     </div>
 
     <script>
-        // === CUSTOM LOGGER FOR ANDROID ===
-        var debugLog = document.getElementById('debug-log');
-        function logMsg(msg) {
-            var d = new Date();
-            var time = d.getHours() + ':' + d.getMinutes() + ':' + d.getSeconds();
-            debugLog.innerHTML = '[' + time + '] ' + msg + '<br>' + debugLog.innerHTML;
-            // Keep log short
-            if (debugLog.innerHTML.length > 2000) debugLog.innerHTML = debugLog.innerHTML.substring(0, 2000);
+        // Use ONLY 'var' and 'function' for Android 6 compatibility
+        var debugElement = document.getElementById('debug-log');
+        function log(m) {
+            debugElement.innerHTML = m + "<br>" + debugElement.innerHTML;
+            console.log(m);
         }
 
-        // Catch global JavaScript errors
-        window.onerror = function(message, source, lineno, colno, error) {
-            logMsg('<span style="color:red">ERROR: ' + message + ' at line ' + lineno + '</span>');
-            return true; 
-        };
-
-        var LAT = "28.6692", LON = "-81.2068";
-        var currentImgIdx = 1;
-        var initialPhotoLoaded = false;
-
-        var PI_BASE_URL = "http://192.168.0.20:3001";
-        var PI_PHOTO_API = PI_BASE_URL + "/photos";
-        var PI_UPLOAD_API = PI_BASE_URL + "/upload";
-        var photoList = [];
-        var lastPhotoCount = 0;
-
-        var PI_URL = 'https://api.croomsconnect.com';
-        var PI_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjE5MDAwMDAwMDB9.XaG-6cRHV8WIfTcuFMHhRmPdUiqn_jm15U4vzHrrt6w';
-        var chatMessages = [];
-
-        function toggleSettings() {
-            var panel = document.getElementById('settings-panel');
-            panel.style.display = (panel.style.display === 'none' || panel.style.display === '') ? 'block' : 'none';
-        }
-
-        function toggleNightMode(forceOn) {
-            var night = document.getElementById('night-overlay');
-            if (forceOn) {
-                night.style.display = 'block';
-                document.getElementById('settings-panel').style.display = 'none';
-            } else {
-                night.style.display = 'none';
-            }
-        }
-
-        function checkSchedule() {
-            var now = new Date();
-            var currentTime = now.getHours() + ":" + (now.getMinutes() < 10 ? '0' : '') + now.getMinutes();
-            if (currentTime === document.getElementById('sleepTime').value) toggleNightMode(true);
-            else if (currentTime === document.getElementById('wakeTime').value) toggleNightMode(false);
-        }
+        var PI_IP = "192.168.0.20"; // Ensure this is correct
+        var PHOTO_API = "http://" + PI_IP + ":3001/photos";
+        var currentIdx = 1;
+        var photos = [];
 
         function updateClock() {
             var now = new Date();
-            var h = now.getHours(), m = now.getMinutes(), ampm = h >= 12 ? 'PM' : 'AM';
+            var h = now.getHours();
+            var m = now.getMinutes();
+            var ampm = h >= 12 ? 'PM' : 'AM';
             h = h % 12 || 12;
-            m = m < 10 ? '0' + m : m;
-            document.getElementById('time').innerText = h + ':' + m + ' ' + ampm;
-            var days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-            var months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-            document.getElementById('date').innerText = days[now.getDay()] + ', ' + months[now.getMonth()] + ' ' + now.getDate();
-            checkSchedule();
+            document.getElementById('time').innerText = h + ":" + (m < 10 ? '0'+m : m) + " " + ampm;
         }
 
-        function updateWeather() {
+        function fetchPhotoList() {
+            log("Attempting Fetch: " + PHOTO_API);
             var xhr = new XMLHttpRequest();
-            xhr.open("GET", "https://api.open-meteo.com/v1/forecast?latitude=" + LAT + "&longitude=" + LON + "&current_weather=true&temperature_unit=fahrenheit", true);
-            xhr.onreadystatechange = function () {
-                if (xhr.readyState == 4 && xhr.status == 200) {
-                    var data = JSON.parse(xhr.responseText);
-                    document.getElementById('temp').innerText = Math.round(data.current_weather.temperature) + "°";
-                    document.getElementById('condition').innerText = "Updated";
-                }
-            };
-            xhr.send();
-        }
-
-        function fetchPhotos() {
-            logMsg("Fetching photo list...");
-            var xhr = new XMLHttpRequest();
-            xhr.open("GET", PI_PHOTO_API, true);
-            xhr.onreadystatechange = function () {
-                if (xhr.readyState == 4) {
-                    if (xhr.status == 200) {
+            
+            // Android 6 needs very explicit timeout and error handling
+            xhr.timeout = 10000; 
+            
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
                         try {
-                            var data = JSON.parse(xhr.responseText);
-                            logMsg("Found " + data.length + " photos");
-                            photoList = data;
-                            if (!initialPhotoLoaded && photoList.length > 0) {
-                                initialPhotoLoaded = true;
-                                updatePhoto();
-                            }
-                        } catch(e) { logMsg("Parse error on photo list"); }
-                    } else { logMsg('<span style="color:yellow">Fetch failed: Network/CORS</span>'); }
+                            photos = JSON.parse(xhr.responseText);
+                            log("SUCCESS: Found " + photos.length + " photos");
+                            if (photos.length > 0) { startSlideshow(); }
+                        } catch(e) {
+                            log("JSON ERROR: Could not parse response");
+                        }
+                    } else {
+                        log("NET ERROR: Status " + xhr.status + " (Check Pi Server/CORS)");
+                    }
                 }
             };
+
+            xhr.onerror = function() {
+                log("FATAL: Network Request Blocked or Refused");
+            };
+
+            xhr.ontimeout = function() {
+                log("TIMEOUT: Pi not responding");
+            };
+
+            xhr.open("GET", PHOTO_API, true);
             xhr.send();
+        }
+
+        function startSlideshow() {
+            updatePhoto();
+            setInterval(updatePhoto, 30000);
         }
 
         function updatePhoto() {
-            if (photoList.length === 0) return;
+            if (photos.length === 0) return;
+            
+            var nextIdx = (currentIdx === 1) ? 2 : 1;
+            var targetImg = document.getElementById('photo' + nextIdx);
+            var currentImg = document.getElementById('photo' + currentIdx);
+            
+            var randomImg = photos[Math.floor(Math.random() * photos.length)];
+            // Cache buster is vital for old WebKit
+            var imgUrl = "http://" + PI_IP + ":3001/photos/" + encodeURI(randomImg) + "?t=" + new Date().getTime();
+            
+            log("Loading Img: " + randomImg.substring(0,10));
 
-            var nextImgIdx = currentImgIdx === 1 ? 2 : 1;
-            var target = document.getElementById('photo' + nextImgIdx);
-            var current = document.getElementById('photo' + currentImgIdx);
-
-            var randomIndex = Math.floor(Math.random() * photoList.length);
-            var safeFilename = encodeURI(photoList[randomIndex]); 
-            var newSrc = PI_BASE_URL + "/photos/" + safeFilename + "?t=" + new Date().getTime();
-
-            logMsg("Loading: " + safeFilename.substring(0,15) + "...");
-
-            target.onerror = function() {
-                logMsg('<span style="color:red">Img Load Error</span>');
-                setTimeout(updatePhoto, 5000); 
-            };
-
-            target.onload = function() {
-                logMsg("Img loaded successfully.");
-                var intensity = document.getElementById('animationIntensity').value;
-                var transition = document.getElementById('transitionType').value;
-
-                target.style.transition = 'none';
-                target.style.webkitTransition = 'none';
-                target.style.opacity = '0.01'; // Don't use 0
+            targetImg.onload = function() {
+                log("Img Ready. Swapping...");
                 
-                if (transition === 'slide') {
-                    target.style.transform = 'translate3d(100%, 0, 0) scale(1.0)';
-                    target.style.webkitTransform = 'translate3d(100%, 0, 0) scale(1.0)';
-                } else {
-                    target.style.transform = 'translate3d(0, 0, 0) scale(1.0)';
-                    target.style.webkitTransform = 'translate3d(0, 0, 0) scale(1.0)';
-                }
+                // Reset target position
+                targetImg.style.transition = "none";
+                targetImg.style.webkitTransition = "none";
+                targetImg.style.opacity = "0.01";
+                
+                // Force Reflow
+                void targetImg.offsetWidth;
 
-                void target.offsetWidth; // Force layout
+                // Execute Transition
+                targetImg.style.transition = "opacity 2s ease-in-out";
+                targetImg.style.webkitTransition = "opacity 2s ease-in-out";
+                targetImg.style.opacity = "1";
 
-                var scaleTarget = intensity === 'intense' ? 1.25 : 1.12;
-                var finalTransform = 'translate3d(0,0,0) scale(1.0)';
+                currentImg.style.transition = "opacity 2s ease-in-out";
+                currentImg.style.webkitTransition = "opacity 2s ease-in-out";
+                currentImg.style.opacity = "0.01";
 
-                if (transition === 'fade' || transition === 'zoom') {
-                    target.style.transition = 'opacity 2s ease-in-out, transform 45s linear';
-                    target.style.webkitTransition = 'opacity 2s ease-in-out, -webkit-transform 45s linear';
-                    finalTransform = 'translate3d(0,0,0) scale(' + scaleTarget + ')';
-                } else if (transition === 'slide') {
-                    target.style.transition = 'transform 1s ease-in-out, opacity 1s ease-in-out';
-                    target.style.webkitTransition = '-webkit-transform 1s ease-in-out, opacity 1s ease-in-out';
-                }
-
-                target.style.opacity = '1';
-                target.style.transform = finalTransform;
-                target.style.webkitTransform = finalTransform;
-
-                current.style.transition = 'opacity 2s ease-in-out';
-                current.style.webkitTransition = 'opacity 2s ease-in-out';
-                current.style.opacity = '0.01'; 
-
-                // Memory management: clear old source after fade out completes
-                setTimeout(function() {
-                    current.src = "";
-                }, 2500);
-
-                currentImgIdx = nextImgIdx;
+                currentIdx = nextIdx;
             };
 
-            target.src = newSrc;
-        }
-
-        // (Upload and Chat functions remain identical to previous iteration to save space, but ensure they are included in your live file)
-        
-        function fetchChat() {
-            if (!PI_URL) return; 
-            var xhr = new XMLHttpRequest();
-            xhr.open("GET", PI_URL + "/rest/v1/messages?select=*&order=timestamp.desc&limit=5", true);
-            xhr.setRequestHeader("apikey", PI_KEY);
-            xhr.setRequestHeader("Authorization", "Bearer " + PI_KEY);
-            xhr.setRequestHeader("Content-Type", "application/json");
-            xhr.onreadystatechange = function () {
-                if (xhr.readyState == 4 && xhr.status == 200) {
-                    try {
-                        var data = JSON.parse(xhr.responseText);
-                        chatMessages = data.reverse(); 
-                        var container = document.getElementById('chat-messages-container');
-                        var htmlString = "";
-                        for (var i = 0; i < chatMessages.length; i++) {
-                            var msg = chatMessages[i];
-                            var username = msg.username || 'User';
-                            var text = msg.is_deleted ? '<i>Deleted</i>' : msg.message;
-                            htmlString += '<div class="chat-message"><div class="chat-content"><span class="chat-user">' + username + '</span><span class="chat-text">' + text + '</span></div></div>';
-                        }
-                        container.innerHTML = htmlString;
-                    } catch (e) {}
-                }
+            targetImg.onerror = function() {
+                log("Error loading image file");
             };
-            xhr.send();
+
+            targetImg.src = imgUrl;
         }
 
-        logMsg("Booting up...");
+        // Initialize
         updateClock();
-        updateWeather();
-        fetchChat(); 
-        fetchPhotos();
-        
         setInterval(updateClock, 1000);
-        setInterval(updateWeather, 600000);
-        setInterval(updatePhoto, 40000);
-        setInterval(fetchPhotos, 10000); // Slowed down slightly to save memory
-        setInterval(fetchChat, 10000); 
+        
+        // Initial Fetch
+        fetchPhotoList();
+        // Refresh list every 5 minutes
+        setInterval(fetchPhotoList, 300000);
 
     </script>
 </body>

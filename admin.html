@@ -134,7 +134,7 @@
                 prefix: "",
                 limit: 100,
                 offset: 0,
-                sortBy: { column: "created_at", order: "desc" } // Show newest first here
+                sortBy: { column: "created_at", order: "desc" }
             });
             xhr.send(body);
         }
@@ -145,7 +145,6 @@
             
             var card = document.createElement('div');
             card.className = 'media-card';
-            card.id = 'card-' + fileName;
 
             var previewHtml = "";
             if (isVideo(fileName)) {
@@ -154,23 +153,26 @@
                 previewHtml = '<img class="media-preview" src="' + publicUrl + '" loading="lazy" alt="Media">';
             }
 
-            // Creating the HTML elements safely for old browsers
+            // FIX: Passing 'this' directly to deleteMedia avoids all ID/Selector crashing issues
+            var safeName = fileName.replace(/'/g, "\\'").replace(/"/g, '&quot;');
             var infoDiv = '<div class="media-info">' +
                               '<div class="media-name">' + fileName + '</div>' +
-                              '<button class="btn-delete" onclick="deleteMedia(\'' + fileName.replace(/'/g, "\\'") + '\')">Delete File</button>' +
+                              '<button class="btn-delete" onclick="deleteMedia(this, \'' + safeName + '\')">Delete File</button>' +
                           '</div>';
 
             card.innerHTML = previewHtml + infoDiv;
             grid.appendChild(card);
         }
 
-        function deleteMedia(fileName) {
+        // FIX: Replaced ID lookup with direct element reference (btnElement)
+        function deleteMedia(btnElement, fileName) {
             if (!confirm("Are you sure you want to delete this file permanently? It will disappear from the dashboard on the next cycle.")) {
                 return;
             }
 
-            var btn = document.querySelector('#card-' + document.getElementById('card-'+fileName).id + ' .btn-delete');
-            if(btn) btn.innerText = "Deleting...";
+            // Grab the parent card directly based on HTML structure (card > infoDiv > button)
+            var card = btnElement.parentNode.parentNode;
+            btnElement.innerText = "Deleting...";
 
             var url = SUPABASE_URL + "/storage/v1/object/" + BUCKET_NAME + "/" + encodeURIComponent(fileName);
             var xhr = new XMLHttpRequest();
@@ -182,18 +184,18 @@
             xhr.onreadystatechange = function () {
                 if (xhr.readyState == 4) {
                     if (xhr.status == 200) {
-                        var card = document.getElementById('card-' + fileName);
-                        if (card) card.parentNode.removeChild(card);
+                        if (card && card.parentNode) {
+                            card.parentNode.removeChild(card);
+                        }
                     } else {
                         alert("Failed to delete file. It may be locked or permissions are incorrect.");
-                        if(btn) btn.innerText = "Delete File";
+                        btnElement.innerText = "Delete File";
                     }
                 }
             };
             xhr.send();
         }
 
-        // Boot
         window.onload = loadMedia;
 
     </script>

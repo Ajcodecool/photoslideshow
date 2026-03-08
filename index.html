@@ -15,7 +15,6 @@
 
         #background-container { position: absolute; width: 100%; height: 100%; z-index: 1; cursor: pointer; background: #000; }
 
-        /* Removed the hardcoded transform transition here so it doesn't fight the keyframes */
         .slide {
             position: absolute; width: 100%; height: 100%;
             opacity: 0; overflow: hidden;
@@ -29,8 +28,9 @@
         .bg-blur {
             position: absolute; width: 100%; height: 100%;
             object-fit: cover;
+            -webkit-filter: blur(30px); /* ANDROID 6 FIX: Requires Webkit Prefix */
             filter: blur(30px);
-            transform: scale(1.15); /* Hides the harsh unblurred edges */
+            transform: scale(1.15); 
             z-index: 1;
             opacity: 0.5;
         }
@@ -145,12 +145,12 @@
         <div id="slide1" class="slide active">
             <img class="bg-blur" src="" alt="">
             <img class="fg-image" src="" alt="">
-            <video class="fg-video" src="" muted playsinline style="display:none;"></video>
+            <video class="fg-video" src="" muted playsinline webkit-playsinline preload="auto" style="display:none;"></video>
         </div>
         <div id="slide2" class="slide">
             <img class="bg-blur" src="" alt="">
             <img class="fg-image" src="" alt="">
-            <video class="fg-video" src="" muted playsinline style="display:none;"></video>
+            <video class="fg-video" src="" muted playsinline webkit-playsinline preload="auto" style="display:none;"></video>
         </div>
     </div>
 
@@ -201,6 +201,7 @@
         <div class="schedule-row">
             <span>Animation Intensity:</span>
             <select id="animationIntensity">
+                <option value="none">Off (Static)</option>
                 <option value="normal" selected>Normal</option>
                 <option value="intense">Intense</option>
             </select>
@@ -237,7 +238,7 @@
         var activeIdx = 1;
         var rotationTimer = null;
         var chatMinimized = false;
-        var lastPreloadedMedia = null; // Fix for duplicates
+        var lastPreloadedMedia = null; 
 
         // UI Toggles
         function toggleSettings() {
@@ -312,10 +313,9 @@
 
         function getRandomMediaName() {
             if (photoList.length === 0) return null;
-            if (photoList.length === 1) return photoList[0]; // Avoid infinite loop if only 1 photo exists
+            if (photoList.length === 1) return photoList[0]; 
             
             var media;
-            // Keep grabbing a random photo until it's different from the last one
             do {
                 media = photoList[Math.floor(Math.random() * photoList.length)];
             } while (media === lastPreloadedMedia);
@@ -339,7 +339,7 @@
                 imgFg.style.display = 'none';
                 vidFg.style.display = 'block';
                 vidFg.src = url;
-                vidFg.load(); // Preload for Android 6
+                vidFg.load(); 
             } else {
                 vidFg.style.display = 'none';
                 imgBg.style.display = 'block';
@@ -368,15 +368,12 @@
             var transition = document.getElementById('transitionType').value;
             var defaultDurationSec = parseInt(document.getElementById('slideDuration').value, 10) || 40;
             
-            // Add a buffer to the animation so it continues moving slightly during the crossfade
             var animDurationSec = defaultDurationSec + 3;
 
-            // Reset transitions for the incoming slide
             nextSlide.style.transition = 'none';
             nextSlide.className = 'slide';
             var forceReflow = nextSlide.offsetWidth; 
 
-            // Apply specific transition
             if (transition === 'fade') {
                 nextSlide.style.transition = 'opacity 2s ease-in-out';
             } else if (transition === 'slide') {
@@ -388,18 +385,18 @@
                 nextSlide.style.transform = 'scale(1.0)';
             }
 
-            // Apply kenburns scale effect - now dynamically tied to user duration setting!
             if (intensity === 'intense') {
                 nextSlide.style.animation = 'intenseKenburns ' + animDurationSec + 's linear forwards';
-            } else {
+            } else if (intensity === 'normal') {
                 nextSlide.style.animation = 'kenburns ' + animDurationSec + 's linear forwards';
+            } else {
+                nextSlide.style.animation = 'none';
+                nextSlide.style.transform = 'scale(1.0)';
             }
 
-            // Swap visibility
             nextSlide.className += ' active';
             currentSlide.className = 'slide';
 
-            // Handle Media Playback & Timers
             var currentVid = currentSlide.querySelector('video');
             if (currentVid) currentVid.pause();
 
@@ -407,24 +404,22 @@
             var isVid = nextSlide.getAttribute('data-is-video') === 'true';
 
             if (isVid && nextVid) {
-                nextVid.currentTime = 0;
-                var playPromise = nextVid.play();
-                if (playPromise !== undefined) {
-                    playPromise.catch(function(e) { console.log('Autoplay prevented', e); });
-                }
+                // ANDROID 6 FIX: Give the DOM a tiny fraction of a second to render 'display: block' before forcing play
+                setTimeout(function() {
+                    nextVid.currentTime = 0;
+                    var playPromise = nextVid.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch(function(e) { console.log('Autoplay prevented', e); });
+                    }
+                }, 50);
                 
-                // Trigger next slide when video ends
                 nextVid.onended = function() { showNextSlide(); };
-                nextVid.onerror = function() { queueNext(defaultDurationSec * 1000); }; // Fallback
-                
-                // Safety net in case onended fails (Max 10 minutes)
+                nextVid.onerror = function() { queueNext(defaultDurationSec * 1000); };
                 queueNext(600000); 
             } else {
-                // Standard image duration
                 queueNext(defaultDurationSec * 1000);
             }
 
-            // Prepare the slide that just hid for the *next* cycle
             activeIdx = nextIdx;
             var prepIdx = activeIdx === 1 ? 2 : 1;
             prepareSlide(prepIdx, getRandomMediaName());
@@ -452,10 +447,8 @@
                             }
                         }
 
-                        // Live Update: Detect new media
                         if (validPhotos.length !== lastPhotoCount) {
                             if (lastPhotoCount > 0 && validPhotos.length > lastPhotoCount) {
-                                // A new file was added. Override the currently preloading slide immediately!
                                 var newestMedia = validPhotos[validPhotos.length - 1];
                                 var preloadingIdx = activeIdx === 1 ? 2 : 1;
                                 prepareSlide(preloadingIdx, newestMedia);
@@ -471,7 +464,6 @@
                 }
             };
 
-            // Fetch sorting by creation time so newest is always at the end
             var body = JSON.stringify({
                 prefix: "",
                 limit: 100,
@@ -517,7 +509,6 @@
                         uploadBtn.style.background = "#4caf50";
                         fileInput.value = ""; 
                         
-                        // Refetch library so it auto-injects into the rotation
                         fetchPhotos();
 
                         setTimeout(function() {
@@ -588,15 +579,13 @@
         // === BOOT SEQUENCE ===
         function initSlideshow() {
             if (photoList.length === 0) {
-                setTimeout(initSlideshow, 1000); // Wait for fetchPhotos
+                setTimeout(initSlideshow, 1000); 
                 return;
             }
             
-            // Preload both slots initially
             prepareSlide(1, getRandomMediaName());
             prepareSlide(2, getRandomMediaName());
             
-            // Kickstart the cycle
             setTimeout(showNextSlide, 500);
         }
 
@@ -608,7 +597,7 @@
         
         setInterval(updateClock, 1000);
         setInterval(updateWeather, 600000);
-        setInterval(fetchPhotos, 5000); // Checks for new uploads frequently
+        setInterval(fetchPhotos, 5000); 
         setInterval(fetchChat, 10000); 
 
     </script>

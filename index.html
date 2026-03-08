@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pi Dashboard Pro - Fixed Storage</title>
+    <title>Pi Dashboard Pro + Scheduler + Live Chat (Android 6 Safe)</title>
     
     <style>
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -18,7 +18,7 @@
         .photo {
             position: absolute; width: 100%; height: 100%;
             object-fit: cover; opacity: 0;
-            transition: opacity 2s ease-in-out;
+            transition: opacity 2s ease-in-out, transform 45s linear;
             will-change: opacity, transform;
             transform: scale(1.0);
         }
@@ -83,24 +83,68 @@
             background: #444; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer;
         }
 
+        /* === CHAT WIDGET STYLES === */
         #chat-widget {
-            position: absolute; top: 40px; right: 40px; width: 320px;
-            background: rgba(0, 0, 0, 0.55); border-radius: 16px;
-            padding: 20px; z-index: 10; pointer-events: none;
-            display: flex; flex-direction: column;
+            position: absolute;
+            top: 40px;
+            right: 40px;
+            width: 320px;
+            background: rgba(0, 0, 0, 0.55);
+            border-radius: 16px;
+            padding: 20px;
+            z-index: 10;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
             border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
 
         .chat-header {
-            font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px;
-            color: rgba(255, 255, 255, 0.6); border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            padding-bottom: 8px; margin-bottom: 15px;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: rgba(255, 255, 255, 0.6);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 8px;
+            margin-bottom: 15px;
         }
 
-        .chat-message { display: flex; align-items: flex-start; margin-bottom: 12px; }
-        .chat-avatar { width: 36px; height: 36px; border-radius: 50%; margin-right: 12px; border: 2px solid rgba(255,255,255,0.2); }
-        .chat-user { font-weight: bold; color: #4da6ff; font-size: 13px; }
-        .chat-text { color: #eee; font-size: 14px; line-height: 1.4; }
+        .chat-message {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .chat-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            object-fit: cover;
+            background: #444;
+            border: 2px solid rgba(255,255,255,0.2);
+            margin-right: 12px;
+        }
+
+        .chat-content {
+            display: flex;
+            flex-direction: column;
+            width: calc(100% - 48px);
+        }
+
+        .chat-user {
+            font-weight: bold;
+            color: #4da6ff;
+            font-size: 13px;
+            margin-bottom: 3px;
+        }
+
+        .chat-text {
+            color: #eee;
+            font-size: 14px;
+            line-height: 1.4;
+            word-wrap: break-word;
+        }
     </style>
 </head>
 <body>
@@ -115,7 +159,7 @@
     <div id="chat-widget">
         <div class="chat-header">Live Chat</div>
         <div id="chat-messages-container">
-            <div style="color: rgba(255,255,255,0.5); font-size: 12px;">Loading...</div>
+            <div style="color: rgba(255,255,255,0.5); font-size: 12px;">Loading messages...</div>
         </div>
     </div>
 
@@ -132,34 +176,88 @@
 
     <div id="settings-panel">
         <h3 style="margin: 0 0 15px 0">Frame Control</h3>
+
+        <div class="schedule-row" style="flex-direction: column; align-items: stretch; gap: 8px;">
+            <span style="text-align: left;">Upload New Photo:</span>
+            <input type="file" id="fileInput" accept="image/*" onclick="event.stopPropagation();">
+            <button class="btn" id="uploadBtn" onclick="uploadPhoto(); event.stopPropagation();" style="background: #4da6ff; color: #000; font-weight: bold; margin: 0;">Upload to Pi</button>
+        </div>
+
+        <div class="schedule-row">
+            <span>Sleep Time:</span>
+            <input type="time" id="sleepTime" value="22:00">
+        </div>
+        <div class="schedule-row">
+            <span>Wake Time:</span>
+            <input type="time" id="wakeTime" value="07:00">
+        </div>
+
+        <div class="schedule-row">
+            <span>Animation Intensity:</span>
+            <select id="animationIntensity">
+                <option value="normal" selected>Normal</option>
+                <option value="intense">Intense</option>
+            </select>
+        </div>
+
+        <div class="schedule-row">
+            <span>Transition Type:</span>
+            <select id="transitionType">
+                <option value="fade" selected>Fade</option>
+                <option value="slide">Slide</option>
+                <option value="zoom">Zoom</option>
+            </select>
+        </div>
+
         <button class="btn" onclick="updatePhoto(); event.stopPropagation();">Next Photo</button>
-        <div class="schedule-row">
-            <span>Sleep:</span> <input type="time" id="sleepTime" value="22:00">
-        </div>
-        <div class="schedule-row">
-            <span>Wake:</span> <input type="time" id="wakeTime" value="07:00">
-        </div>
-        <button class="btn" onclick="toggleNightMode(true); event.stopPropagation();">Manual Night</button>
-        <button class="btn" onclick="location.reload(); event.stopPropagation();">Refresh</button>
-        <button class="btn" onclick="toggleSettings(); event.stopPropagation();">Close</button>
+        <button class="btn" onclick="toggleNightMode(true); event.stopPropagation();">Manual Night Mode</button>
+        <button class="btn" onclick="location.reload(); event.stopPropagation();">Refresh Dashboard</button>
+        <button class="btn" onclick="toggleSettings(); event.stopPropagation();">Save & Close</button>
     </div>
 
     <script>
+        // === OLD ANDROID 6 SAFE JAVASCRIPT ===
         var LAT = "28.6692", LON = "-81.2068";
+        var currentImgIdx = 1;
+
+        // Pi Photo API Configuration
+        var PI_BASE_URL = "http://192.168.0.20:3001";
+        var PI_PHOTO_API = PI_BASE_URL + "/photos";
+        var PI_UPLOAD_API = PI_BASE_URL + "/upload"; // Adjust if your endpoint is different
+        var photoList = [];
+        var lastPhotoCount = 0;
+
+        // API Credentials
         var PI_URL = 'https://api.croomsconnect.com';
         var PI_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjE5MDAwMDAwMDB9.XaG-6cRHV8WIfTcuFMHhRmPdUiqn_jm15U4vzHrrt6w';
-        var BUCKET = "slideshow-photos";
-        
-        var photoList = [];
-        var currentImgIdx = 1;
+        var chatMessages = [];
 
         function toggleSettings() {
             var panel = document.getElementById('settings-panel');
-            panel.style.display = (panel.style.display === 'block') ? 'none' : 'block';
+            var isHidden = panel.style.display === 'none' || panel.style.display === '';
+            panel.style.display = isHidden ? 'block' : 'none';
         }
 
-        function toggleNightMode(on) {
-            document.getElementById('night-overlay').style.display = on ? 'block' : 'none';
+        function toggleNightMode(forceOn) {
+            var night = document.getElementById('night-overlay');
+            if (forceOn) {
+                night.style.display = 'block';
+                document.getElementById('settings-panel').style.display = 'none';
+            } else {
+                night.style.display = 'none';
+            }
+        }
+
+        function checkSchedule() {
+            var now = new Date();
+            var h = now.getHours();
+            var m = now.getMinutes();
+            var currentTime = h + ":" + (m < 10 ? '0' : '') + m;
+            var sleep = document.getElementById('sleepTime').value;
+            var wake = document.getElementById('wakeTime').value;
+
+            if (currentTime === sleep) toggleNightMode(true);
+            else if (currentTime === wake) toggleNightMode(false);
         }
 
         function updateClock() {
@@ -169,52 +267,48 @@
             h = h % 12 || 12;
             m = m < 10 ? '0' + m : m;
             document.getElementById('time').innerText = h + ':' + m + ' ' + ampm;
-            document.getElementById('date').innerText = now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
-            
-            // Auto Sleep/Wake
-            var currentTime = (now.getHours() < 10 ? '0' : '') + now.getHours() + ":" + (m < 10 ? '0' : '') + m;
-            if (currentTime === document.getElementById('sleepTime').value) toggleNightMode(true);
-            if (currentTime === document.getElementById('wakeTime').value) toggleNightMode(false);
+
+            var days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+            var months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+            document.getElementById('date').innerText = days[now.getDay()] + ', ' + months[now.getMonth()] + ' ' + now.getDate();
+
+            checkSchedule();
         }
 
         function updateWeather() {
+            var url = "https://api.open-meteo.com/v1/forecast?latitude=" + LAT + "&longitude=" + LON + "&current_weather=true&temperature_unit=fahrenheit";
             var xhr = new XMLHttpRequest();
-            xhr.open("GET", "https://api.open-meteo.com/v1/forecast?latitude="+LAT+"&longitude="+LON+"&current_weather=true&temperature_unit=fahrenheit", true);
+            xhr.open("GET", url, true);
             xhr.onreadystatechange = function () {
                 if (xhr.readyState == 4 && xhr.status == 200) {
                     var data = JSON.parse(xhr.responseText);
+                    var weatherMap = {0: "Clear Sky", 1: "Mainly Clear", 2: "Partly Cloudy", 3: "Overcast", 45: "Fog", 51: "Drizzle", 61: "Rain", 71: "Snow", 95: "Storm"};
                     document.getElementById('temp').innerText = Math.round(data.current_weather.temperature) + "°";
-                    document.getElementById('condition').innerText = "Clear Sky"; // Simplified for brevity
+                    document.getElementById('condition').innerText = weatherMap[data.current_weather.weathercode] || "Cloudy";
                 }
             };
             xhr.send();
         }
 
-        // === FIXED FETCH PHOTOS (The 400 Fix) ===
         function fetchPhotos() {
             var xhr = new XMLHttpRequest();
-            // Pointing to the list endpoint for the specific bucket
-            xhr.open("POST", PI_URL + "/storage/v1/object/list/" + BUCKET, true);
-            
-            // Critical Headers
-            xhr.setRequestHeader("apikey", PI_KEY);
-            xhr.setRequestHeader("Authorization", "Bearer " + PI_KEY);
-            xhr.setRequestHeader("Content-Type", "application/json");
+            xhr.open("GET", PI_PHOTO_API, true);
 
             xhr.onreadystatechange = function () {
-                if (xhr.readyState == 4) {
-                    if (xhr.status == 200) {
+                if (xhr.readyState == 4 && xhr.status == 200) {
+                    try {
                         var data = JSON.parse(xhr.responseText);
-                        photoList = data;
-                        console.log("Photos synced:", photoList.length);
-                        if(document.getElementById('photo1').src === "" && photoList.length > 0) updatePhoto();
-                    } else {
-                        console.error("Storage Error:", xhr.status, xhr.responseText);
+                        if (data.length !== lastPhotoCount) {
+                            photoList = data;
+                            lastPhotoCount = data.length;
+                            console.log("New photos detected:", data.length);
+                        }
+                    } catch(e) {
+                        console.log("Photo list parse error");
                     }
                 }
             };
-            // Critical Body: Must send at least an empty object for a 200 OK
-            xhr.send(JSON.stringify({ "limit": 100, "offset": 0, "sortBy": { "column": "name", "order": "asc" } }));
+            xhr.send();
         }
 
         function updatePhoto() {
@@ -224,50 +318,175 @@
             var target = document.getElementById('photo' + nextImgIdx);
             var current = document.getElementById('photo' + currentImgIdx);
 
-            var randomFile = photoList[Math.floor(Math.random() * photoList.length)].name;
-            // Public URL format for Supabase Storage
-            var newSrc = PI_URL + "/storage/v1/object/public/" + BUCKET + "/" + randomFile;
+            var randomIndex = Math.floor(Math.random() * photoList.length);
+            var newSrc = PI_BASE_URL + "/photos/" + photoList[randomIndex];
 
             var tempImg = new Image();
             tempImg.onload = function() {
                 target.src = newSrc;
-                target.style.animation = 'kenburns 45s linear forwards';
-                target.className = 'photo active';
+
+                var intensity = document.getElementById('animationIntensity').value;
+                var transition = document.getElementById('transitionType').value;
+
+                target.style.transition = 'none';
+                target.className = 'photo';
                 current.className = 'photo';
+                var forceReflow = target.offsetWidth; 
+
+                switch (transition) {
+                    case 'fade':
+                        target.style.transition = 'opacity 2s ease-in-out, transform 45s linear';
+                        break;
+                    case 'slide':
+                        target.style.transition = 'transform 1s ease-in-out, opacity 1s ease-in-out';
+                        target.style.transform = 'translateX(100%)';
+                        setTimeout(function() { 
+                            target.style.transform = 'translateX(0)'; 
+                        }, 20);
+                        break;
+                    case 'zoom':
+                        target.style.transition = 'transform 5s ease-in-out, opacity 2s ease-in-out';
+                        target.style.transform = 'scale(1.0)';
+                        break;
+                }
+
+                if (intensity === 'intense') {
+                    target.style.animation = 'intenseKenburns 45s linear forwards';
+                } else {
+                    target.style.animation = 'kenburns 45s linear forwards';
+                }
+
+                target.className += ' active';
                 currentImgIdx = nextImgIdx;
             };
             tempImg.src = newSrc;
         }
+        
+        // === UPLOAD PHOTO FUNCTION ===
+        function uploadPhoto() {
+            var fileInput = document.getElementById('fileInput');
+            var uploadBtn = document.getElementById('uploadBtn');
+
+            if (fileInput.files.length === 0) {
+                alert("Please select an image file first.");
+                return;
+            }
+
+            var file = fileInput.files[0];
+            var formData = new FormData();
+            
+            // "photo" is the field name. Change this if your Pi server expects "image" or "file" instead.
+            formData.append("photo", file); 
+
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", PI_UPLOAD_API, true);
+
+            // Progress bar update
+            xhr.upload.onprogress = function(event) {
+                if (event.lengthComputable) {
+                    var percentComplete = Math.round((event.loaded / event.total) * 100);
+                    uploadBtn.innerText = "Uploading... " + percentComplete + "%";
+                }
+            };
+
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState == 4) {
+                    if (xhr.status == 200 || xhr.status == 201) {
+                        uploadBtn.innerText = "Upload Success!";
+                        uploadBtn.style.background = "#4caf50"; // Turn green
+                        fileInput.value = ""; // Clear input
+                        
+                        // Immediately fetch the new list and show the new photo
+                        fetchPhotos();
+                        setTimeout(updatePhoto, 1500); 
+
+                        // Reset button after 3 seconds
+                        setTimeout(function() {
+                            uploadBtn.innerText = "Upload to Pi";
+                            uploadBtn.style.background = "#4da6ff";
+                        }, 3000);
+                    } else {
+                        uploadBtn.innerText = "Upload Failed";
+                        uploadBtn.style.background = "#f44336"; // Turn red
+                        setTimeout(function() {
+                            uploadBtn.innerText = "Upload to Pi";
+                            uploadBtn.style.background = "#4da6ff";
+                        }, 3000);
+                        alert("Server returned error code: " + xhr.status);
+                    }
+                }
+            };
+
+            xhr.send(formData);
+        }
+
+        function renderMessages() {
+            var container = document.getElementById('chat-messages-container');
+            
+            if (chatMessages.length === 0) {
+                container.innerHTML = '<div style="color: rgba(255,255,255,0.5); font-size: 12px;">No messages yet.</div>';
+                return;
+            }
+
+            var htmlString = "";
+            for (var i = 0; i < chatMessages.length; i++) {
+                var msg = chatMessages[i];
+                var username = msg.username ? msg.username : 'Unknown User';
+                var avatar = msg.avatar_url ? msg.avatar_url : 'https://ui-avatars.com/api/?name=' + encodeURIComponent(username) + '&background=random';
+                var text = msg.is_deleted ? '<i>Message deleted</i>' : msg.message;
+
+                htmlString += '<div class="chat-message" id="msg-' + msg.id + '">' +
+                                '<img class="chat-avatar" src="' + avatar + '" onerror="this.src=\'https://ui-avatars.com/api/?name=U&background=random\'">' +
+                                '<div class="chat-content">' +
+                                    '<span class="chat-user">' + username + '</span>' +
+                                    '<span class="chat-text">' + text + '</span>' +
+                                '</div>' +
+                              '</div>';
+            }
+            
+            container.innerHTML = htmlString;
+        }
 
         function fetchChat() {
+            if (!PI_URL) return; 
+
+            var url = PI_URL + "/rest/v1/messages?select=*&order=timestamp.desc&limit=5";
             var xhr = new XMLHttpRequest();
-            xhr.open("GET", PI_URL + "/rest/v1/messages?select=*&order=timestamp.desc&limit=5", true);
+            xhr.open("GET", url, true);
+            
             xhr.setRequestHeader("apikey", PI_KEY);
             xhr.setRequestHeader("Authorization", "Bearer " + PI_KEY);
+            xhr.setRequestHeader("Content-Type", "application/json");
+
             xhr.onreadystatechange = function () {
                 if (xhr.readyState == 4 && xhr.status == 200) {
-                    var msgs = JSON.parse(xhr.responseText).reverse();
-                    var html = "";
-                    for (var i = 0; i < msgs.length; i++) {
-                        var avatar = "https://ui-avatars.com/api/?name=" + (msgs[i].username || 'U');
-                        html += '<div class="chat-message"><img class="chat-avatar" src="'+avatar+'"><div class="chat-content"><span class="chat-user">'+msgs[i].username+'</span><span class="chat-text">'+msgs[i].message+'</span></div></div>';
+                    try {
+                        var data = JSON.parse(xhr.responseText);
+                        chatMessages = data.reverse(); 
+                        renderMessages();
+                    } catch (e) {
+                        console.error("Error parsing chat data.");
                     }
-                    document.getElementById('chat-messages-container').innerHTML = html;
                 }
             };
             xhr.send();
         }
 
-        // Start
+        // Initialize Everything
         updateClock();
         updateWeather();
+        fetchChat(); 
         fetchPhotos();
-        fetchChat();
-
+        
+        // Initial photo load right after fetching the list
+        setTimeout(updatePhoto, 1000);
+        
         setInterval(updateClock, 1000);
-        setInterval(updatePhoto, 30000);
-        setInterval(fetchPhotos, 60000);
-        setInterval(fetchChat, 10000);
+        setInterval(updateWeather, 600000);
+        setInterval(updatePhoto, 40000);
+        setInterval(fetchPhotos, 5000);
+        setInterval(fetchChat, 10000); 
+
     </script>
 </body>
 </html>

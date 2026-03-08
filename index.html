@@ -334,7 +334,7 @@
         const SUPABASE_URL = 'https://api.croomsconnect.com';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjE5MDAwMDAwMDB9.XaG-6cRHV8WIfTcuFMHhRmPdUiqn_jm15U4vzHrrt6w';
         
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         let chatMessages = [];
 
         function renderMessages() {
@@ -364,7 +364,7 @@
         async function initChat() {
             try {
                 // 1. Fetch initial last 5 messages
-                const { data, error } = await supabase
+                const { data, error } = await supabaseClient
                     .from('messages')
                     .select('*')
                     .order('timestamp', { ascending: false })
@@ -379,7 +379,7 @@
                 }
 
                 // 2. Subscribe to real-time new messages
-                supabase.channel('public:messages')
+                supabaseClient.channel('public:messages')
                     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
                         chatMessages.push(payload.new);
                         // Keep only the last 5

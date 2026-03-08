@@ -141,12 +141,6 @@
             line-height: 1.4;
             word-wrap: break-word;
         }
-
-        .chat-text img {
-            max-width: 100%;
-            border-radius: 8px;
-            margin-top: 5px;
-        }
     </style>
 </head>
 <body>
@@ -154,7 +148,7 @@
     <div id="night-overlay" onclick="toggleNightMode(false)"></div>
 
     <div id="background-container" onclick="toggleSettings()">
-        <img id="photo1" class="photo active" src="https://picsum.photos/1280/800" alt="">
+        <img id="photo1" class="photo active" src="" alt="">
         <img id="photo2" class="photo" src="" alt="">
     </div>
 
@@ -213,10 +207,13 @@
 
     <script>
         // === OLD ANDROID 6 SAFE JAVASCRIPT ===
-        // We strictly use 'var' instead of 'let/const' and basic functions instead of arrow functions (=>)
-
         var LAT = "28.6692", LON = "-81.2068";
         var currentImgIdx = 1;
+
+        // Pi Photo API Configuration
+        var PI_PHOTO_API = "http://192.168.0.20:3001/photos";
+        var photoList = [];
+        var lastPhotoCount = 0;
 
         // API Credentials
         var PI_URL = 'https://api.croomsconnect.com';
@@ -281,11 +278,36 @@
             xhr.send();
         }
 
+        function fetchPhotos() {
+            var xhr = new XMLHttpRequest();
+            xhr.open("GET", PI_PHOTO_API, true);
+
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState == 4 && xhr.status == 200) {
+                    try {
+                        var data = JSON.parse(xhr.responseText);
+                        if (data.length !== lastPhotoCount) {
+                            photoList = data;
+                            lastPhotoCount = data.length;
+                            console.log("New photos detected:", data.length);
+                        }
+                    } catch(e) {
+                        console.log("Photo list parse error");
+                    }
+                }
+            };
+            xhr.send();
+        }
+
         function updatePhoto() {
+            if (photoList.length === 0) return;
+
             var nextImgIdx = currentImgIdx === 1 ? 2 : 1;
             var target = document.getElementById('photo' + nextImgIdx);
             var current = document.getElementById('photo' + currentImgIdx);
-            var newSrc = "https://picsum.photos/1280/800?random=" + Math.random();
+
+            var randomIndex = Math.floor(Math.random() * photoList.length);
+            var newSrc = "http://192.168.0.20:3001/photos/" + photoList[randomIndex];
 
             var tempImg = new Image();
             tempImg.onload = function() {
@@ -328,9 +350,6 @@
             tempImg.src = newSrc;
         }
 
-        // === ANDROID 6 COMPATIBLE SUPABASE FETCHING ===
-        // We use old-school XMLHttpRequest instead of Fetch or the modern Supabase Client.
-
         function renderMessages() {
             var container = document.getElementById('chat-messages-container');
             
@@ -359,14 +378,12 @@
         }
 
         function fetchChat() {
-            // Replaced the block condition so it correctly fetches from your API
             if (!PI_URL) return; 
 
             var url = PI_URL + "/rest/v1/messages?select=*&order=timestamp.desc&limit=5";
             var xhr = new XMLHttpRequest();
             xhr.open("GET", url, true);
             
-            // Supabase Authentication Headers
             xhr.setRequestHeader("apikey", PI_KEY);
             xhr.setRequestHeader("Authorization", "Bearer " + PI_KEY);
             xhr.setRequestHeader("Content-Type", "application/json");
@@ -375,7 +392,6 @@
                 if (xhr.readyState == 4 && xhr.status == 200) {
                     try {
                         var data = JSON.parse(xhr.responseText);
-                        // Reverse the array so the newest message is at the bottom
                         chatMessages = data.reverse(); 
                         renderMessages();
                     } catch (e) {
@@ -390,13 +406,15 @@
         updateClock();
         updateWeather();
         fetchChat(); 
+        fetchPhotos();
+        
+        // Initial photo load right after fetching the list
+        setTimeout(updatePhoto, 1000);
         
         setInterval(updateClock, 1000);
         setInterval(updateWeather, 600000);
         setInterval(updatePhoto, 40000);
-        
-        // Instead of WebSockets, we poll the REST API every 10 seconds for new messages. 
-        // This is MUCH safer for the Rockchip CPU memory limits.
+        setInterval(fetchPhotos, 5000);
         setInterval(fetchChat, 10000); 
 
     </script>

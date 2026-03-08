@@ -15,10 +15,11 @@
 
         #background-container { position: absolute; width: 100%; height: 100%; z-index: 1; cursor: pointer; background: #000; }
 
+        /* Removed the hardcoded transform transition here so it doesn't fight the keyframes */
         .slide {
             position: absolute; width: 100%; height: 100%;
             opacity: 0; overflow: hidden;
-            transition: opacity 2s ease-in-out, transform 45s linear;
+            transition: opacity 2s ease-in-out;
             will-change: opacity, transform;
             transform: scale(1.0);
         }
@@ -236,6 +237,7 @@
         var activeIdx = 1;
         var rotationTimer = null;
         var chatMinimized = false;
+        var lastPreloadedMedia = null; // Fix for duplicates
 
         // UI Toggles
         function toggleSettings() {
@@ -310,7 +312,16 @@
 
         function getRandomMediaName() {
             if (photoList.length === 0) return null;
-            return photoList[Math.floor(Math.random() * photoList.length)];
+            if (photoList.length === 1) return photoList[0]; // Avoid infinite loop if only 1 photo exists
+            
+            var media;
+            // Keep grabbing a random photo until it's different from the last one
+            do {
+                media = photoList[Math.floor(Math.random() * photoList.length)];
+            } while (media === lastPreloadedMedia);
+            
+            lastPreloadedMedia = media;
+            return media;
         }
 
         function prepareSlide(slideIdx, mediaName) {
@@ -356,6 +367,9 @@
             var intensity = document.getElementById('animationIntensity').value;
             var transition = document.getElementById('transitionType').value;
             var defaultDurationSec = parseInt(document.getElementById('slideDuration').value, 10) || 40;
+            
+            // Add a buffer to the animation so it continues moving slightly during the crossfade
+            var animDurationSec = defaultDurationSec + 3;
 
             // Reset transitions for the incoming slide
             nextSlide.style.transition = 'none';
@@ -364,7 +378,7 @@
 
             // Apply specific transition
             if (transition === 'fade') {
-                nextSlide.style.transition = 'opacity 2s ease-in-out, transform 45s linear';
+                nextSlide.style.transition = 'opacity 2s ease-in-out';
             } else if (transition === 'slide') {
                 nextSlide.style.transition = 'transform 1s ease-in-out, opacity 1s ease-in-out';
                 nextSlide.style.transform = 'translateX(100%)';
@@ -374,11 +388,11 @@
                 nextSlide.style.transform = 'scale(1.0)';
             }
 
-            // Apply kenburns scale effect
+            // Apply kenburns scale effect - now dynamically tied to user duration setting!
             if (intensity === 'intense') {
-                nextSlide.style.animation = 'intenseKenburns 45s linear forwards';
+                nextSlide.style.animation = 'intenseKenburns ' + animDurationSec + 's linear forwards';
             } else {
-                nextSlide.style.animation = 'kenburns 45s linear forwards';
+                nextSlide.style.animation = 'kenburns ' + animDurationSec + 's linear forwards';
             }
 
             // Swap visibility

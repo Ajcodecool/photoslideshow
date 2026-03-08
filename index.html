@@ -78,6 +78,10 @@
         input[type="time"], select {
             background: #444; color: white; border: none; padding: 5px; border-radius: 5px;
         }
+        
+        input[type="file"] {
+            background: #444; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer;
+        }
 
         /* === CHAT WIDGET STYLES === */
         #chat-widget {
@@ -173,6 +177,12 @@
     <div id="settings-panel">
         <h3 style="margin: 0 0 15px 0">Frame Control</h3>
 
+        <div class="schedule-row" style="flex-direction: column; align-items: stretch; gap: 8px;">
+            <span style="text-align: left;">Upload New Photo:</span>
+            <input type="file" id="fileInput" accept="image/*" onclick="event.stopPropagation();">
+            <button class="btn" id="uploadBtn" onclick="uploadPhoto(); event.stopPropagation();" style="background: #4da6ff; color: #000; font-weight: bold; margin: 0;">Upload to Pi</button>
+        </div>
+
         <div class="schedule-row">
             <span>Sleep Time:</span>
             <input type="time" id="sleepTime" value="22:00">
@@ -211,7 +221,9 @@
         var currentImgIdx = 1;
 
         // Pi Photo API Configuration
-        var PI_PHOTO_API = "http://192.168.0.20:3001/photos";
+        var PI_BASE_URL = "http://192.168.0.20:3001";
+        var PI_PHOTO_API = PI_BASE_URL + "/photos";
+        var PI_UPLOAD_API = PI_BASE_URL + "/upload"; // Adjust if your endpoint is different
         var photoList = [];
         var lastPhotoCount = 0;
 
@@ -307,7 +319,7 @@
             var current = document.getElementById('photo' + currentImgIdx);
 
             var randomIndex = Math.floor(Math.random() * photoList.length);
-            var newSrc = "http://192.168.0.20:3001/photos/" + photoList[randomIndex];
+            var newSrc = PI_BASE_URL + "/photos/" + photoList[randomIndex];
 
             var tempImg = new Image();
             tempImg.onload = function() {
@@ -348,6 +360,64 @@
                 currentImgIdx = nextImgIdx;
             };
             tempImg.src = newSrc;
+        }
+        
+        // === UPLOAD PHOTO FUNCTION ===
+        function uploadPhoto() {
+            var fileInput = document.getElementById('fileInput');
+            var uploadBtn = document.getElementById('uploadBtn');
+
+            if (fileInput.files.length === 0) {
+                alert("Please select an image file first.");
+                return;
+            }
+
+            var file = fileInput.files[0];
+            var formData = new FormData();
+            
+            // "photo" is the field name. Change this if your Pi server expects "image" or "file" instead.
+            formData.append("photo", file); 
+
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", PI_UPLOAD_API, true);
+
+            // Progress bar update
+            xhr.upload.onprogress = function(event) {
+                if (event.lengthComputable) {
+                    var percentComplete = Math.round((event.loaded / event.total) * 100);
+                    uploadBtn.innerText = "Uploading... " + percentComplete + "%";
+                }
+            };
+
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState == 4) {
+                    if (xhr.status == 200 || xhr.status == 201) {
+                        uploadBtn.innerText = "Upload Success!";
+                        uploadBtn.style.background = "#4caf50"; // Turn green
+                        fileInput.value = ""; // Clear input
+                        
+                        // Immediately fetch the new list and show the new photo
+                        fetchPhotos();
+                        setTimeout(updatePhoto, 1500); 
+
+                        // Reset button after 3 seconds
+                        setTimeout(function() {
+                            uploadBtn.innerText = "Upload to Pi";
+                            uploadBtn.style.background = "#4da6ff";
+                        }, 3000);
+                    } else {
+                        uploadBtn.innerText = "Upload Failed";
+                        uploadBtn.style.background = "#f44336"; // Turn red
+                        setTimeout(function() {
+                            uploadBtn.innerText = "Upload to Pi";
+                            uploadBtn.style.background = "#4da6ff";
+                        }, 3000);
+                        alert("Server returned error code: " + xhr.status);
+                    }
+                }
+            };
+
+            xhr.send(formData);
         }
 
         function renderMessages() {

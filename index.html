@@ -218,9 +218,9 @@
         var LAT = "28.6692", LON = "-81.2068";
         var currentImgIdx = 1;
 
-        // 🚨 YOUR SUPABASE CREDENTIALS HERE 🚨
-        var SUPABASE_URL = 'YOUR_SUPABASE_URL_HERE';
-        var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjE5MDAwMDAwMDB9.XaG-6cRHV8WIfTcuFMHhRmPdUiqn_jm15U4vzHrrt6w';
+        // API Credentials
+        var PI_URL = 'https://api.croomsconnect.com';
+        var PI_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjE5MDAwMDAwMDB9.XaG-6cRHV8WIfTcuFMHhRmPdUiqn_jm15U4vzHrrt6w';
         var chatMessages = [];
 
         function toggleSettings() {
@@ -359,15 +359,16 @@
         }
 
         function fetchChat() {
-            if (SUPABASE_URL === 'https://api.croomsconnect.com') return; // Prevent errors if keys aren't set
+            // Replaced the block condition so it correctly fetches from your API
+            if (!PI_URL) return; 
 
-            var url = SUPABASE_URL + "/rest/v1/messages?select=*&order=timestamp.desc&limit=5";
+            var url = PI_URL + "/rest/v1/messages?select=*&order=timestamp.desc&limit=5";
             var xhr = new XMLHttpRequest();
             xhr.open("GET", url, true);
             
             // Supabase Authentication Headers
-            xhr.setRequestHeader("apikey", SUPABASE_ANON_KEY);
-            xhr.setRequestHeader("Authorization", "Bearer " + SUPABASE_ANON_KEY);
+            xhr.setRequestHeader("apikey", PI_KEY);
+            xhr.setRequestHeader("Authorization", "Bearer " + PI_KEY);
             xhr.setRequestHeader("Content-Type", "application/json");
 
             xhr.onreadystatechange = function () {

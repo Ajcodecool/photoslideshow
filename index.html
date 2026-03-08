@@ -15,12 +15,18 @@
 
         #background-container { position: absolute; width: 100%; height: 100%; z-index: 1; cursor: pointer; }
 
+        /* Updated photo class with Android 6 WebKit prefixes and GPU acceleration */
         .photo {
             position: absolute; width: 100%; height: 100%;
             object-fit: cover; opacity: 0;
             transition: opacity 2s ease-in-out, transform 45s linear;
+            -webkit-transition: opacity 2s ease-in-out, -webkit-transform 45s linear;
             will-change: opacity, transform;
-            transform: scale(1.0);
+            
+            /* Force GPU hardware acceleration on RK3066 */
+            -webkit-backface-visibility: hidden;
+            -webkit-transform: translateZ(0);
+            transform: translateZ(0) scale(1.0);
         }
 
         .active { opacity: 1; }
@@ -216,14 +222,15 @@
     </div>
 
     <script>
-        // === OLD ANDROID 6 SAFE JAVASCRIPT ===
+        // === UPDATED ANDROID 6 SAFE JAVASCRIPT ===
         var LAT = "28.6692", LON = "-81.2068";
         var currentImgIdx = 1;
+        var initialPhotoLoaded = false; // Tracks if we've successfully loaded the first image
 
         // Pi Photo API Configuration
         var PI_BASE_URL = "http://192.168.0.20:3001";
         var PI_PHOTO_API = PI_BASE_URL + "/photos";
-        var PI_UPLOAD_API = PI_BASE_URL + "/upload"; // Adjust if your endpoint is different
+        var PI_UPLOAD_API = PI_BASE_URL + "/upload";
         var photoList = [];
         var lastPhotoCount = 0;
 
@@ -295,23 +302,32 @@
             xhr.open("GET", PI_PHOTO_API, true);
 
             xhr.onreadystatechange = function () {
-                if (xhr.readyState == 4 && xhr.status == 200) {
-                    try {
-                        var data = JSON.parse(xhr.responseText);
-                        if (data.length !== lastPhotoCount) {
-                            photoList = data;
-                            lastPhotoCount = data.length;
-                            console.log("New photos detected:", data.length);
+                if (xhr.readyState == 4) {
+                    if (xhr.status == 200) {
+                        try {
+                            var data = JSON.parse(xhr.responseText);
+                            if (data.length !== lastPhotoCount) {
+                                photoList = data;
+                                lastPhotoCount = data.length;
+                                console.log("New photos detected:", data.length);
+                            }
+                            
+                            // FIX: Trigger the first photo load ONLY after we know we have data
+                            if (!initialPhotoLoaded && photoList.length > 0) {
+                                initialPhotoLoaded = true;
+                                updatePhoto();
+                            }
+                        } catch(e) {
+                            console.log("Photo list parse error");
                         }
-                    } catch(e) {
-                        console.log("Photo list parse error");
+                    } else {
+                        console.log("Failed to fetch photo list from Pi. Network or CORS issue.");
                     }
                 }
             };
             xhr.send();
         }
 
-        // === UPDATED ANDROID 6 SAFE PHOTO LOADER ===
         function updatePhoto() {
             if (photoList.length === 0) {
                 console.log("Waiting for photos...");
@@ -324,41 +340,58 @@
 
             var randomIndex = Math.floor(Math.random() * photoList.length);
             
-            // FIX: Safely encode the filename so Android 6 doesn't choke on spaces
-            var safeFilename = encodeURIComponent(photoList[randomIndex]);
+            // FIX: Use encodeURI instead of encodeURIComponent so slashes in folders don't break
+            var safeFilename = encodeURI(photoList[randomIndex]);
             var newSrc = PI_BASE_URL + "/photos/" + safeFilename;
 
-            // FIX: Attach onload directly to the DOM element to prevent Garbage Collection
+            // FIX: Add onerror handler. If a photo fails, try another one in 5 seconds.
+            target.onerror = function() {
+                console.log("Failed to load image: " + newSrc);
+                setTimeout(updatePhoto, 5000); 
+            };
+
             target.onload = function() {
                 var intensity = document.getElementById('animationIntensity').value;
                 var transition = document.getElementById('transitionType').value;
 
+                // Strip classes to reset animations safely for older memory management
                 target.style.transition = 'none';
+                target.style.webkitTransition = 'none';
                 target.className = 'photo';
                 current.className = 'photo';
+                
+                // Force layout recalculation
                 var forceReflow = target.offsetWidth; 
 
                 switch (transition) {
                     case 'fade':
                         target.style.transition = 'opacity 2s ease-in-out, transform 45s linear';
+                        target.style.webkitTransition = 'opacity 2s ease-in-out, -webkit-transform 45s linear';
                         break;
                     case 'slide':
                         target.style.transition = 'transform 1s ease-in-out, opacity 1s ease-in-out';
+                        target.style.webkitTransition = '-webkit-transform 1s ease-in-out, opacity 1s ease-in-out';
                         target.style.transform = 'translateX(100%)';
+                        target.style.webkitTransform = 'translateX(100%)';
                         setTimeout(function() { 
                             target.style.transform = 'translateX(0)'; 
+                            target.style.webkitTransform = 'translateX(0)'; 
                         }, 20);
                         break;
                     case 'zoom':
                         target.style.transition = 'transform 5s ease-in-out, opacity 2s ease-in-out';
+                        target.style.webkitTransition = '-webkit-transform 5s ease-in-out, opacity 2s ease-in-out';
                         target.style.transform = 'scale(1.0)';
+                        target.style.webkitTransform = 'scale(1.0)';
                         break;
                 }
 
                 if (intensity === 'intense') {
                     target.style.animation = 'intenseKenburns 45s linear forwards';
+                    target.style.webkitAnimation = 'intenseKenburns 45s linear forwards';
                 } else {
                     target.style.animation = 'kenburns 45s linear forwards';
+                    target.style.webkitAnimation = 'kenburns 45s linear forwards';
                 }
 
                 target.className += ' active';
@@ -368,8 +401,7 @@
             // Trigger the load
             target.src = newSrc;
         }
-        
-        // === UPLOAD PHOTO FUNCTION ===
+
         function uploadPhoto() {
             var fileInput = document.getElementById('fileInput');
             var uploadBtn = document.getElementById('uploadBtn');
@@ -382,13 +414,11 @@
             var file = fileInput.files[0];
             var formData = new FormData();
             
-            // "photo" is the field name. Change this if your Pi server expects "image" or "file" instead.
             formData.append("photo", file); 
 
             var xhr = new XMLHttpRequest();
             xhr.open("POST", PI_UPLOAD_API, true);
 
-            // Progress bar update
             xhr.upload.onprogress = function(event) {
                 if (event.lengthComputable) {
                     var percentComplete = Math.round((event.loaded / event.total) * 100);
@@ -400,21 +430,18 @@
                 if (xhr.readyState == 4) {
                     if (xhr.status == 200 || xhr.status == 201) {
                         uploadBtn.innerText = "Upload Success!";
-                        uploadBtn.style.background = "#4caf50"; // Turn green
-                        fileInput.value = ""; // Clear input
+                        uploadBtn.style.background = "#4caf50"; 
+                        fileInput.value = ""; 
                         
-                        // Immediately fetch the new list and show the new photo
                         fetchPhotos();
-                        setTimeout(updatePhoto, 1500); 
-
-                        // Reset button after 3 seconds
+                        
                         setTimeout(function() {
                             uploadBtn.innerText = "Upload to Pi";
                             uploadBtn.style.background = "#4da6ff";
                         }, 3000);
                     } else {
                         uploadBtn.innerText = "Upload Failed";
-                        uploadBtn.style.background = "#f44336"; // Turn red
+                        uploadBtn.style.background = "#f44336"; 
                         setTimeout(function() {
                             uploadBtn.innerText = "Upload to Pi";
                             uploadBtn.style.background = "#4da6ff";
@@ -484,9 +511,6 @@
         updateWeather();
         fetchChat(); 
         fetchPhotos();
-        
-        // Initial photo load right after fetching the list
-        setTimeout(updatePhoto, 1000);
         
         setInterval(updateClock, 1000);
         setInterval(updateWeather, 600000);

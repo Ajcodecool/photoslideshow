@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Media Admin</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            border-bottom: 1px solid #333;
+            padding-bottom: 15px;
+            margin-bottom: 30px;
+        }
+        #media-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .media-card {
+            background: #242424;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+        .media-preview {
+            width: 100%;
+            height: 180px;
+            object-fit: cover;
+            background: #000;
+        }
+        .media-info {
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+        }
+        .media-name {
+            font-size: 14px;
+            margin-bottom: 15px;
+            word-break: break-all;
+            flex-grow: 1;
+            color: #ccc;
+        }
+        .delete-btn {
+            background: #d32f2f;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            width: 100%;
+        }
+        .delete-btn:hover {
+            background: #b71c1c;
+        }
+        #loading {
+            text-align: center;
+            color: #888;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Dashboard Media Admin</h1>
+    <div id="loading">Loading media...</div>
+    <div id="media-grid"></div>
+
+    <script src="config.js"></script>
+    <script>
+        // Pull Credentials from config.js
+        var SUPABASE_URL = APP_CONFIG.SUPABASE_URL;
+        var SUPABASE_KEY = APP_CONFIG.SUPABASE_KEY;
+        var BUCKET_NAME = APP_CONFIG.BUCKET_NAME;
+
+        function isVideo(name) {
+            return name.match(/\.(mp4|webm|ogg)$/i) !== null;
+        }
+
+        function loadMedia() {
+            var grid = document.getElementById('media-grid');
+            var loading = document.getElementById('loading');
+            
+            var url = SUPABASE_URL + "/storage/v1/object/list/" + BUCKET_NAME;
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", url, true);
+            
+            xhr.setRequestHeader("apikey", SUPABASE_KEY);
+            xhr.setRequestHeader("Authorization", "Bearer " + SUPABASE_KEY);
+            xhr.setRequestHeader("Content-Type", "application/json");
+
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState == 4) {
+                    if (xhr.status == 200) {
+                        var data = JSON.parse(xhr.responseText);
+                        grid.innerHTML = "";
+                        loading.style.display = "none";
+                        
+                        var hasMedia = false;
+
+                        for (var i = 0; i < data.length; i++) {
+                            var file = data[i];
+                            if (file.name && file.name !== ".emptyFolderPlaceholder") {
+                                hasMedia = true;
+                                var fileUrl = SUPABASE_URL + "/storage/v1/object/public/" + BUCKET_NAME + "/" + encodeURIComponent(file.name);
+                                
+                                var card = document.createElement('div');
+                                card.className = 'media-card';
+                                
+                                var previewHtml = "";
+                                if (isVideo(file.name)) {
+                                    previewHtml = '<video class="media-preview" src="' + fileUrl + '" controls preload="metadata"></video>';
+                                } else {
+                                    previewHtml = '<img class="media-preview" src="' + fileUrl + '" alt="media">';
+                                }
+
+                                card.innerHTML = previewHtml + 
+                                    '<div class="media-info">' +
+                                        '<div class="media-name">' + file.name + '</div>' +
+                                        '<button class="delete-btn" onclick="deleteMedia(this, \'' + file.name.replace(/'/g, "\\'") + '\')">Delete File</button>' +
+                                    '</div>';
+                                    
+                                grid.appendChild(card);
+                            }
+                        }
+
+                        if (!hasMedia) {
+                            loading.innerText = "No media found in the cloud.";
+                            loading.style.display = "block";
+                        }
+
+                    } else {
+                        loading.innerText = "Error loading media. Check console.";
+                        console.error("Fetch error:", xhr.responseText);
+                    }
+                }
+            };
+
+            var body = JSON.stringify({
+                prefix: "",
+                limit: 100,
+                offset: 0,
+                sortBy: { column: "created_at", order: "desc" } 
+            });
+            xhr.send(body);
+        }
+
+        // FIX: Replaced ID lookup with direct element reference (btnElement)
+        function deleteMedia(btnElement, fileName) {
+            if (!confirm("Are you sure you want to delete this file permanently? It will disappear from the dashboard on the next cycle.")) {
+                return;
+            }
+
+            // Grab the parent card directly based on HTML structure (card > infoDiv > button)
+            var card = btnElement.parentNode.parentNode;
+            btnElement.innerText = "Deleting...";
+
+            var url = SUPABASE_URL + "/storage/v1/object/" + BUCKET_NAME + "/" + encodeURIComponent(fileName);
+            var xhr = new XMLHttpRequest();
+            xhr.open("DELETE", url, true);
+            
+            xhr.setRequestHeader("apikey", SUPABASE_KEY);
+            xhr.setRequestHeader("Authorization", "Bearer " + SUPABASE_KEY);
+
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState == 4) {
+                    if (xhr.status == 200) {
+                        if (card && card.parentNode) {
+                            card.parentNode.removeChild(card);
+                        }
+                    } else {
+                        alert("Failed to delete file. It may be locked or permissions are incorrect.");
+                        btnElement.innerText = "Delete File";
+                    }
+                }
+            };
+            xhr.send();
+        }
+
+        window.onload = loadMedia;
+
+    </script>
+</body>
+</html>

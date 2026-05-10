@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Pro + Media + Scheduler + Chat</title>
+    
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            background-color: #000; color: white;
+            font-family: sans-serif; overflow: hidden;
+        }
+
+        #background-container { position: absolute; width: 100%; height: 100%; z-index: 1; cursor: pointer; background: #000; }
+
+        .slide {
+            position: absolute; width: 100%; height: 100%;
+            opacity: 0; overflow: hidden;
+            transition: opacity 2s ease-in-out;
+            will-change: opacity, transform;
+            transform: scale(1.0);
+        }
+
+        .slide.active { opacity: 1; }
+
+        .bg-blur {
+            position: absolute; width: 100%; height: 100%;
+            object-fit: cover;
+            -webkit-filter: blur(30px); /* ANDROID 6 FIX: Requires Webkit Prefix */
+            filter: blur(30px);
+            transform: scale(1.15); 
+            z-index: 1;
+            opacity: 0.5;
+        }
+
+        .fg-image, .fg-video {
+            position: absolute; width: 100%; height: 100%;
+            object-fit: contain;
+            z-index: 2;
+        }
+
+        @keyframes kenburns {
+            from { transform: scale(1.0); }
+            to { transform: scale(1.12); }
+        }
+
+        @keyframes intenseKenburns {
+            from { transform: scale(1.0); }
+            to { transform: scale(1.25); }
+        }
+
+        #overlay {
+            position: absolute; bottom: 0; left: 0; right: 0;
+            background: linear-gradient(transparent, rgba(0,0,0,0.8));
+            padding: 50px; z-index: 10;
+            display: flex; justify-content: space-between; align-items: flex-end;
+            pointer-events: none; 
+        }
+
+        #time { font-size: 100px; font-weight: bold; line-height: 1; text-shadow: 2px 2px 8px rgba(0,0,0,0.5); }
+        #date { font-size: 26px; opacity: 0.8; margin-top: 10px; }
+        #temp { font-size: 80px; line-height: 1; }
+        #condition { font-size: 26px; opacity: 0.8; }
+
+        #night-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: black; z-index: 500; display: none;
+        }
+
+        #settings-panel {
+            position: fixed; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 85%; max-width: 450px;
+            background: rgba(25, 25, 25, 0.98);
+            border: 2px solid #444; border-radius: 20px;
+            padding: 25px; z-index: 100;
+            display: none; text-align: center;
+            box-shadow: 0 0 50px rgba(0,0,0,1);
+            max-height: 90vh; overflow-y: auto;
+        }
+
+        .btn {
+            display: block; width: 100%; padding: 12px; margin: 8px 0;
+            background: #333; color: white; border: 1px solid #555;
+            border-radius: 10px; font-size: 16px; cursor: pointer;
+        }
+
+        .schedule-row {
+            display: flex; justify-content: space-between; align-items: center;
+            margin: 10px 0; padding: 10px; background: #222; border-radius: 8px;
+        }
+
+        input[type="time"], input[type="number"], select {
+            background: #444; color: white; border: none; padding: 5px; border-radius: 5px;
+        }
+        
+        input[type="file"] {
+            background: #444; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer;
+        }
+
+        /* === CHAT WIDGET STYLES === */
+        #chat-widget {
+            position: absolute;
+            top: 40px; right: 40px; width: 320px;
+            background: rgba(0, 0, 0, 0.55);
+            border-radius: 16px; padding: 20px;
+            z-index: 10;
+            display: flex; flex-direction: column;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            transition: all 0.3s ease;
+        }
+
+        .chat-header {
+            font-size: 12px; text-transform: uppercase;
+            letter-spacing: 1.5px; color: rgba(255, 255, 255, 0.6);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 8px; margin-bottom: 15px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+
+        .chat-message { display: flex; align-items: flex-start; margin-bottom: 12px; }
+        .chat-avatar {
+            width: 36px; height: 36px; border-radius: 50%;
+            object-fit: cover; background: #444;
+            border: 2px solid rgba(255,255,255,0.2); margin-right: 12px;
+        }
+        .chat-content { display: flex; flex-direction: column; width: calc(100% - 48px); }
+        .chat-user { font-weight: bold; color: #4da6ff; font-size: 13px; margin-bottom: 3px; }
+        .chat-text { color: #eee; font-size: 14px; line-height: 1.4; word-wrap: break-word; }
+        
+        #chat-min-btn {
+            cursor: pointer; font-size: 16px; padding: 0 5px;
+            pointer-events: auto; font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="night-overlay" onclick="toggleNightMode(false)"></div>
+
+    <div id="background-container" onclick="toggleSettings()">
+        <div id="slide1" class="slide active">
+            <img class="bg-blur" src="" alt="">
+            <img class="fg-image" src="" alt="">
+            <video class="fg-video" src="" muted playsinline webkit-playsinline preload="auto" style="display:none;"></video>
+        </div>
+        <div id="slide2" class="slide">
+            <img class="bg-blur" src="" alt="">
+            <img class="fg-image" src="" alt="">
+            <video class="fg-video" src="" muted playsinline webkit-playsinline preload="auto" style="display:none;"></video>
+        </div>
+    </div>
+
+    <div id="chat-widget">
+        <div class="chat-header">
+            <span>Live Chat</span>
+            <span id="chat-min-btn" onclick="toggleChat()">—</span>
+        </div>
+        <div id="chat-messages-container" style="pointer-events: none;">
+            <div style="color: rgba(255,255,255,0.5); font-size: 12px;">Loading messages...</div>
+        </div>
+    </div>
+
+    <div id="overlay">
+        <div>
+            <div id="time">00:00</div>
+            <div id="date">--</div>
+        </div>
+        <div id="weather-container">
+            <div id="temp">--°</div>
+            <div id="condition">Updating...</div>
+        </div>
+    </div>
+
+    <div id="settings-panel">
+        <h3 style="margin: 0 0 15px 0">Frame Control</h3>
+
+        <div class="schedule-row" style="flex-direction: column; align-items: stretch; gap: 8px;">
+            <span style="text-align: left;">Upload New Media:</span>
+            <input type="file" id="fileInput" accept="image/*,video/mp4,video/webm" onclick="event.stopPropagation();">
+            <button class="btn" id="uploadBtn" onclick="uploadMedia(); event.stopPropagation();" style="background: #4da6ff; color: #000; font-weight: bold; margin: 0;">Upload to Cloud</button>
+        </div>
+
+        <div class="schedule-row">
+            <span>Slide Duration (Sec):</span>
+            <input type="number" id="slideDuration" value="40" min="5" max="300" style="width: 60px;">
+        </div>
+
+        <div class="schedule-row">
+            <span>Sleep Time:</span>
+            <input type="time" id="sleepTime" value="22:00">
+        </div>
+        <div class="schedule-row">
+            <span>Wake Time:</span>
+            <input type="time" id="wakeTime" value="07:00">
+        </div>
+
+        <div class="schedule-row">
+            <span>Animation Intensity:</span>
+            <select id="animationIntensity">
+                <option value="none">Off (Static)</option>
+                <option value="normal" selected>Normal</option>
+                <option value="intense">Intense</option>
+            </select>
+        </div>
+
+        <div class="schedule-row">
+            <span>Transition Type:</span>
+            <select id="transitionType">
+                <option value="fade" selected>Fade</option>
+                <option value="slide">Slide</option>
+                <option value="zoom">Zoom</option>
+            </select>
+        </div>
+
+        <button class="btn" onclick="showNextSlide(); event.stopPropagation();">Force Next Slide</button>
+        <button class="btn" onclick="toggleNightMode(true); event.stopPropagation();">Manual Night Mode</button>
+        <button class="btn" onclick="location.reload(); event.stopPropagation();">Refresh Dashboard</button>
+        <button class="btn" onclick="toggleSettings(); event.stopPropagation();">Save & Close</button>
+    </div>
+
+    <script src="config.js"></script>
+    <script>
+        // === ANDROID 6 SAFE JAVASCRIPT ===
+        var LAT = "28.6692", LON = "-81.2068";
+        
+        // Supabase API Credentials pulled from config.js
+        var SUPABASE_URL = APP_CONFIG.SUPABASE_URL;
+        var SUPABASE_KEY = APP_CONFIG.SUPABASE_KEY;
+        var BUCKET_NAME = APP_CONFIG.BUCKET_NAME;
+
+        // State Variables
+        var photoList = [];
+        var lastPhotoCount = 0;
+        var chatMessages = [];
+        var activeIdx = 1;
+        var rotationTimer = null;
+        var chatMinimized = false;
+        var lastPreloadedMedia = null; 
+
+        // UI Toggles
+        function toggleSettings() {
+            var panel = document.getElementById('settings-panel');
+            var isHidden = panel.style.display === 'none' || panel.style.display === '';
+            panel.style.display = isHidden ? 'block' : 'none';
+        }
+
+        function toggleNightMode(forceOn) {
+            var night = document.getElementById('night-overlay');
+            if (forceOn) {
+                night.style.display = 'block';
+                document.getElementById('settings-panel').style.display = 'none';
+            } else {
+                night.style.display = 'none';
+            }
+        }
+
+        function toggleChat() {
+            chatMinimized = !chatMinimized;
+            document.getElementById('chat-messages-container').style.display = chatMinimized ? 'none' : 'block';
+            document.getElementById('chat-min-btn').innerText = chatMinimized ? '+' : '—';
+        }
+
+        // Clock & Weather
+        function checkSchedule() {
+            var now = new Date();
+            var h = now.getHours();
+            var m = now.getMinutes();
+            var currentTime = h + ":" + (m < 10 ? '0' : '') + m;
+            var sleep = document.getElementById('sleepTime').value;
+            var wake = document.getElementById('wakeTime').value;
+
+            if (currentTime === sleep) toggleNightMode(true);
+            else if (currentTime === wake) toggleNightMode(false);
+        }
+
+        function updateClock() {
+            var now = new Date();
+            var h = now.getHours(), m = now.getMinutes();
+            var ampm = h >= 12 ? 'PM' : 'AM';
+            h = h % 12 || 12;
+            m = m < 10 ? '0' + m : m;
+            document.getElementById('time').innerText = h + ':' + m + ' ' + ampm;
+
+            var days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+            var months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+            document.getElementById('date').innerText = days[now.getDay()] + ', ' + months[now.getMonth()] + ' ' + now.getDate();
+
+            checkSchedule();
+        }
+
+        function updateWeather() {
+            var url = "https://api.open-meteo.com/v1/forecast?latitude=" + LAT + "&longitude=" + LON + "&current_weather=true&temperature_unit=fahrenheit";
+            var xhr = new XMLHttpRequest();
+            xhr.open("GET", url, true);
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState == 4 && xhr.status == 200) {
+                    var data = JSON.parse(xhr.responseText);
+                    var weatherMap = {0: "Clear Sky", 1: "Mainly Clear", 2: "Partly Cloudy", 3: "Overcast", 45: "Fog", 51: "Drizzle", 61: "Rain", 71: "Snow", 95: "Storm"};
+                    document.getElementById('temp').innerText = Math.round(data.current_weather.temperature) + "°";
+                    document.getElementById('condition').innerText = weatherMap[data.current_weather.weathercode] || "Cloudy";
+                }
+            };
+            xhr.send();
+        }
+
+        // === MEDIA ENGINE (Preloading & Video Support) ===
+        function isVideo(name) {
+            return name.match(/\.(mp4|webm|ogg)$/i) !== null;
+        }
+
+        function getRandomMediaName() {
+            if (photoList.length === 0) return null;
+            if (photoList.length === 1) return photoList[0]; 
+            
+            var media;
+            do {
+                media = photoList[Math.floor(Math.random() * photoList.length)];
+            } while (media === lastPreloadedMedia);
+            
+            lastPreloadedMedia = media;
+            return media;
+        }
+
+        function prepareSlide(slideIdx, mediaName) {
+            if (!mediaName) return;
+            var slide = document.getElementById('slide' + slideIdx);
+            var imgBg = slide.querySelector('.bg-blur');
+            var imgFg = slide.querySelector('.fg-image');
+            var vidFg = slide.querySelector('.fg-video');
+            
+            var url = SUPABASE_URL + "/storage/v1/object/public/" + BUCKET_NAME + "/" + encodeURIComponent(mediaName);
+            slide.setAttribute('data-is-video', isVideo(mediaName));
+
+            if (isVideo(mediaName)) {
+                imgBg.style.display = 'none';
+                imgFg.style.display = 'none';
+                vidFg.style.display = 'block';
+                vidFg.src = url;
+                vidFg.load(); 
+            } else {
+                vidFg.style.display = 'none';
+                imgBg.style.display = 'block';
+                imgFg.style.display = 'block';
+                imgBg.src = url;
+                imgFg.src = url;
+            }
+        }
+
+        function queueNext(ms) {
+            clearTimeout(rotationTimer);
+            rotationTimer = setTimeout(showNextSlide, ms);
+        }
+
+        function showNextSlide() {
+            if (photoList.length === 0) {
+                queueNext(5000);
+                return;
+            }
+
+            var currentSlide = document.getElementById('slide' + activeIdx);
+            var nextIdx = activeIdx === 1 ? 2 : 1;
+            var nextSlide = document.getElementById('slide' + nextIdx);
+
+            var intensity = document.getElementById('animationIntensity').value;
+            var transition = document.getElementById('transitionType').value;
+            var defaultDurationSec = parseInt(document.getElementById('slideDuration').value, 10) || 40;
+            
+            var animDurationSec = defaultDurationSec + 3;
+
+            nextSlide.style.transition = 'none';
+            nextSlide.className = 'slide';
+            var forceReflow = nextSlide.offsetWidth; 
+
+            if (transition === 'fade') {
+                nextSlide.style.transition = 'opacity 2s ease-in-out';
+            } else if (transition === 'slide') {
+                nextSlide.style.transition = 'transform 1s ease-in-out, opacity 1s ease-in-out';
+                nextSlide.style.transform = 'translateX(100%)';
+                setTimeout(function(){ nextSlide.style.transform = 'translateX(0)'; }, 20);
+            } else if (transition === 'zoom') {
+                nextSlide.style.transition = 'transform 5s ease-in-out, opacity 2s ease-in-out';
+                nextSlide.style.transform = 'scale(1.0)';
+            }
+
+            if (intensity === 'intense') {
+                nextSlide.style.animation = 'intenseKenburns ' + animDurationSec + 's linear forwards';
+            } else if (intensity === 'normal') {
+                nextSlide.style.animation = 'kenburns ' + animDurationSec + 's linear forwards';
+            } else {
+                nextSlide.style.animation = 'none';
+                nextSlide.style.transform = 'scale(1.0)';
+            }
+
+            nextSlide.className += ' active';
+            currentSlide.className = 'slide';
+
+            var currentVid = currentSlide.querySelector('video');
+            if (currentVid) currentVid.pause();
+
+            var nextVid = nextSlide.querySelector('video');
+            var isVid = nextSlide.getAttribute('data-is-video') === 'true';
+
+            if (isVid && nextVid) {
+                // ANDROID 6 FIX: Give the DOM a tiny fraction of a second to render 'display: block' before forcing play
+                setTimeout(function() {
+                    nextVid.currentTime = 0;
+                    var playPromise = nextVid.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch(function(e) { console.log('Autoplay prevented', e); });
+                    }
+                }, 50);
+                
+                nextVid.onended = function() { showNextSlide(); };
+                nextVid.onerror = function() { queueNext(defaultDurationSec * 1000); };
+                queueNext(600000); 
+            } else {
+                queueNext(defaultDurationSec * 1000);
+            }
+
+            activeIdx = nextIdx;
+            var prepIdx = activeIdx === 1 ? 2 : 1;
+            prepareSlide(prepIdx, getRandomMediaName());
+        }
+
+        // === SUPABASE SPECIFIC ===
+        function fetchPhotos() {
+            var url = SUPABASE_URL + "/storage/v1/object/list/" + BUCKET_NAME;
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", url, true);
+            
+            xhr.setRequestHeader("apikey", SUPABASE_KEY);
+            xhr.setRequestHeader("Authorization", "Bearer " + SUPABASE_KEY);
+            xhr.setRequestHeader("Content-Type", "application/json");
+
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState == 4 && xhr.status == 200) {
+                    try {
+                        var data = JSON.parse(xhr.responseText);
+                        var validPhotos = [];
+                        
+                        for (var i = 0; i < data.length; i++) {
+                            if (data[i].name && data[i].name !== ".emptyFolderPlaceholder") {
+                                validPhotos.push(data[i].name);
+                            }
+                        }
+
+                        if (validPhotos.length !== lastPhotoCount) {
+                            if (lastPhotoCount > 0 && validPhotos.length > lastPhotoCount) {
+                                var newestMedia = validPhotos[validPhotos.length - 1];
+                                var preloadingIdx = activeIdx === 1 ? 2 : 1;
+                                prepareSlide(preloadingIdx, newestMedia);
+                            }
+                            
+                            photoList = validPhotos;
+                            lastPhotoCount = validPhotos.length;
+                            console.log("Library synced. Total media:", validPhotos.length);
+                        }
+                    } catch(e) {
+                        console.log("Photo list parse error");
+                    }
+                }
+            };
+
+            var body = JSON.stringify({
+                prefix: "",
+                limit: 100,
+                offset: 0,
+                sortBy: { column: "created_at", order: "asc" } 
+            });
+            xhr.send(body);
+        }
+        
+        function uploadMedia() {
+            var fileInput = document.getElementById('fileInput');
+            var uploadBtn = document.getElementById('uploadBtn');
+
+            if (fileInput.files.length === 0) {
+                alert("Please select an image or video file first.");
+                return;
+            }
+
+            var file = fileInput.files[0];
+            var safeName = file.name.replace(/[^a-zA-Z0-9.\-]/g, "_");
+            var fileName = Date.now() + "_" + safeName;
+
+            var uploadUrl = SUPABASE_URL + "/storage/v1/object/" + BUCKET_NAME + "/" + fileName;
+
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", uploadUrl, true);
+            
+            xhr.setRequestHeader("apikey", SUPABASE_KEY);
+            xhr.setRequestHeader("Authorization", "Bearer " + SUPABASE_KEY);
+            xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+
+            xhr.upload.onprogress = function(event) {
+                if (event.lengthComputable) {
+                    var percentComplete = Math.round((event.loaded / event.total) * 100);
+                    uploadBtn.innerText = "Uploading... " + percentComplete + "%";
+                }
+            };
+
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState == 4) {
+                    if (xhr.status == 200 || xhr.status == 201) {
+                        uploadBtn.innerText = "Upload Success!";
+                        uploadBtn.style.background = "#4caf50";
+                        fileInput.value = ""; 
+                        
+                        fetchPhotos();
+
+                        setTimeout(function() {
+                            uploadBtn.innerText = "Upload to Cloud";
+                            uploadBtn.style.background = "#4da6ff";
+                        }, 3000);
+                    } else {
+                        uploadBtn.innerText = "Upload Failed";
+                        uploadBtn.style.background = "#f44336";
+                        setTimeout(function() {
+                            uploadBtn.innerText = "Upload to Cloud";
+                            uploadBtn.style.background = "#4da6ff";
+                        }, 3000);
+                    }
+                }
+            };
+            xhr.send(file);
+        }
+
+        // === CHAT SYSTEM ===
+        function renderMessages() {
+            var container = document.getElementById('chat-messages-container');
+            if (chatMessages.length === 0) {
+                container.innerHTML = '<div style="color: rgba(255,255,255,0.5); font-size: 12px;">No messages yet.</div>';
+                return;
+            }
+
+            var htmlString = "";
+            for (var i = 0; i < chatMessages.length; i++) {
+                var msg = chatMessages[i];
+                var username = msg.username ? msg.username : 'Unknown User';
+                var avatar = msg.avatar_url ? msg.avatar_url : 'https://ui-avatars.com/api/?name=' + encodeURIComponent(username) + '&background=random';
+                var text = msg.is_deleted ? '<i>Message deleted</i>' : msg.message;
+
+                htmlString += '<div class="chat-message" id="msg-' + msg.id + '">' +
+                                '<img class="chat-avatar" src="' + avatar + '" onerror="this.src=\'https://ui-avatars.com/api/?name=U&background=random\'">' +
+                                '<div class="chat-content">' +
+                                    '<span class="chat-user">' + username + '</span>' +
+                                    '<span class="chat-text">' + text + '</span>' +
+                                '</div>' +
+                              '</div>';
+            }
+            container.innerHTML = htmlString;
+        }
+
+        function fetchChat() {
+            if (!SUPABASE_URL) return; 
+
+            var url = SUPABASE_URL + "/rest/v1/messages?select=*&order=timestamp.desc&limit=5";
+            var xhr = new XMLHttpRequest();
+            xhr.open("GET", url, true);
+            
+            xhr.setRequestHeader("apikey", SUPABASE_KEY);
+            xhr.setRequestHeader("Authorization", "Bearer " + SUPABASE_KEY);
+            xhr.setRequestHeader("Content-Type", "application/json");
+
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState == 4 && xhr.status == 200) {
+                    try {
+                        chatMessages = JSON.parse(xhr.responseText).reverse(); 
+                        renderMessages();
+                    } catch (e) {}
+                }
+            };
+            xhr.send();
+        }
+
+        // === BOOT SEQUENCE ===
+        function initSlideshow() {
+            if (photoList.length === 0) {
+                setTimeout(initSlideshow, 1000); 
+                return;
+            }
+            
+            prepareSlide(1, getRandomMediaName());
+            prepareSlide(2, getRandomMediaName());
+            
+            setTimeout(showNextSlide, 500);
+        }
+
+        updateClock();
+        updateWeather();
+        fetchChat(); 
+        fetchPhotos();
+        initSlideshow();
+        
+        setInterval(updateClock, 1000);
+        setInterval(updateWeather, 600000);
+        setInterval(fetchPhotos, 5000); 
+        setInterval(fetchChat, 10000); 
+
+    </script>
+</body>
+</html>

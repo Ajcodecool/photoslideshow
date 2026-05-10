@@ -222,15 +222,14 @@
         <button class="btn" onclick="toggleSettings(); event.stopPropagation();">Save & Close</button>
     </div>
 
-    <script src="config.js"></script>
     <script>
         // === ANDROID 6 SAFE JAVASCRIPT ===
         var LAT = "28.6692", LON = "-81.2068";
         
-        // Supabase API Credentials pulled from config.js
-        var SUPABASE_URL = APP_CONFIG.SUPABASE_URL;
-        var SUPABASE_KEY = APP_CONFIG.SUPABASE_KEY;
-        var BUCKET_NAME = APP_CONFIG.BUCKET_NAME;
+        // Supabase API Credentials
+        var SUPABASE_URL = 'https://api.croomsconnect.com';
+        var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjE5MDAwMDAwMDB9.XaG-6cRHV8WIfTcuFMHhRmPdUiqn_jm15U4vzHrrt6w';
+        var BUCKET_NAME = 'slideshow-photos';
 
         // State Variables
         var photoList = [];

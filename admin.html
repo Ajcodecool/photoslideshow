@@ -41,19 +41,19 @@
             background: #000;
         }
         .media-info {
-            padding: 15px;
+            padding: 10px;
+            flex-grow: 1;
             display: flex;
             flex-direction: column;
-            flex-grow: 1;
+            justify-content: space-between;
         }
         .media-name {
-            font-size: 14px;
-            margin-bottom: 15px;
+            font-size: 12px;
+            color: #aaa;
             word-break: break-all;
-            flex-grow: 1;
-            color: #ccc;
+            margin-bottom: 10px;
         }
-        .delete-btn {
+        .btn-delete {
             background: #d32f2f;
             color: white;
             border: none;
@@ -61,29 +61,29 @@
             border-radius: 5px;
             cursor: pointer;
             font-weight: bold;
-            width: 100%;
+            text-transform: uppercase;
+            font-size: 12px;
         }
-        .delete-btn:hover {
+        .btn-delete:hover {
             background: #b71c1c;
         }
         #loading {
             text-align: center;
-            color: #888;
             font-size: 18px;
+            color: #888;
         }
     </style>
 </head>
 <body>
-    <h1>Dashboard Media Admin</h1>
-    <div id="loading">Loading media...</div>
+
+    <h1>Manage Dashboard Media</h1>
+    <div id="loading">Loading files...</div>
     <div id="media-grid"></div>
 
-    <script src="config.js"></script>
     <script>
-        // Pull Credentials from config.js
-        var SUPABASE_URL = APP_CONFIG.SUPABASE_URL;
-        var SUPABASE_KEY = APP_CONFIG.SUPABASE_KEY;
-        var BUCKET_NAME = APP_CONFIG.BUCKET_NAME;
+        var SUPABASE_URL = 'https://api.croomsconnect.com';
+        var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjE5MDAwMDAwMDB9.XaG-6cRHV8WIfTcuFMHhRmPdUiqn_jm15U4vzHrrt6w';
+        var BUCKET_NAME = 'slideshow-photos';
 
         function isVideo(name) {
             return name.match(/\.(mp4|webm|ogg)$/i) !== null;
@@ -93,6 +93,9 @@
             var grid = document.getElementById('media-grid');
             var loading = document.getElementById('loading');
             
+            grid.innerHTML = "";
+            loading.style.display = "block";
+
             var url = SUPABASE_URL + "/storage/v1/object/list/" + BUCKET_NAME;
             var xhr = new XMLHttpRequest();
             xhr.open("POST", url, true);
@@ -102,49 +105,28 @@
             xhr.setRequestHeader("Content-Type", "application/json");
 
             xhr.onreadystatechange = function () {
-                if (xhr.readyState == 4) {
-                    if (xhr.status == 200) {
+                if (xhr.readyState == 4 && xhr.status == 200) {
+                    loading.style.display = "none";
+                    try {
                         var data = JSON.parse(xhr.responseText);
-                        grid.innerHTML = "";
-                        loading.style.display = "none";
-                        
-                        var hasMedia = false;
+                        var count = 0;
 
                         for (var i = 0; i < data.length; i++) {
                             var file = data[i];
                             if (file.name && file.name !== ".emptyFolderPlaceholder") {
-                                hasMedia = true;
-                                var fileUrl = SUPABASE_URL + "/storage/v1/object/public/" + BUCKET_NAME + "/" + encodeURIComponent(file.name);
-                                
-                                var card = document.createElement('div');
-                                card.className = 'media-card';
-                                
-                                var previewHtml = "";
-                                if (isVideo(file.name)) {
-                                    previewHtml = '<video class="media-preview" src="' + fileUrl + '" controls preload="metadata"></video>';
-                                } else {
-                                    previewHtml = '<img class="media-preview" src="' + fileUrl + '" alt="media">';
-                                }
-
-                                card.innerHTML = previewHtml + 
-                                    '<div class="media-info">' +
-                                        '<div class="media-name">' + file.name + '</div>' +
-                                        '<button class="delete-btn" onclick="deleteMedia(this, \'' + file.name.replace(/'/g, "\\'") + '\')">Delete File</button>' +
-                                    '</div>';
-                                    
-                                grid.appendChild(card);
+                                count++;
+                                renderCard(file.name);
                             }
                         }
 
-                        if (!hasMedia) {
-                            loading.innerText = "No media found in the cloud.";
-                            loading.style.display = "block";
+                        if (count === 0) {
+                            grid.innerHTML = "<p style='grid-column: 1 / -1; text-align: center;'>Your database is empty.</p>";
                         }
-
-                    } else {
-                        loading.innerText = "Error loading media. Check console.";
-                        console.error("Fetch error:", xhr.responseText);
+                    } catch(e) {
+                        loading.innerText = "Error parsing data.";
                     }
+                } else if (xhr.readyState == 4) {
+                    loading.innerText = "Failed to load media. Check credentials.";
                 }
             };
 
@@ -152,9 +134,34 @@
                 prefix: "",
                 limit: 100,
                 offset: 0,
-                sortBy: { column: "created_at", order: "desc" } 
+                sortBy: { column: "created_at", order: "desc" }
             });
             xhr.send(body);
+        }
+
+        function renderCard(fileName) {
+            var grid = document.getElementById('media-grid');
+            var publicUrl = SUPABASE_URL + "/storage/v1/object/public/" + BUCKET_NAME + "/" + encodeURIComponent(fileName);
+            
+            var card = document.createElement('div');
+            card.className = 'media-card';
+
+            var previewHtml = "";
+            if (isVideo(fileName)) {
+                previewHtml = '<video class="media-preview" src="' + publicUrl + '#t=1" controls preload="metadata"></video>';
+            } else {
+                previewHtml = '<img class="media-preview" src="' + publicUrl + '" loading="lazy" alt="Media">';
+            }
+
+            // FIX: Passing 'this' directly to deleteMedia avoids all ID/Selector crashing issues
+            var safeName = fileName.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            var infoDiv = '<div class="media-info">' +
+                              '<div class="media-name">' + fileName + '</div>' +
+                              '<button class="btn-delete" onclick="deleteMedia(this, \'' + safeName + '\')">Delete File</button>' +
+                          '</div>';
+
+            card.innerHTML = previewHtml + infoDiv;
+            grid.appendChild(card);
         }
 
         // FIX: Replaced ID lookup with direct element reference (btnElement)
